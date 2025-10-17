@@ -262,8 +262,8 @@ def bivariate_choropleth_map(
     if cbar_ax is None:
         cbar_ax = inset_axes(
             ax,
-            width=cbar_args.get("width", "10%"),
-            height=cbar_args.get("height", "10%"),
+            width=cbar_args.get("width", "12%"),
+            height=cbar_args.get("height", "12%"),
             loc=cbar_args.get("location", "lower center"),
             bbox_to_anchor=cbar_args.get("bbox_to_anchor", [0.0, 0.0, 1.0, 1.0]),
             bbox_transform=cbar_args.get("bbox_transform", ax.transAxes),
@@ -281,15 +281,15 @@ def bivariate_choropleth_map(
 
     cbar_ax.set_xticks(
         np.arange(k + 1) - 0.5,
-        labels=list(map(lambda x: f"{x:.0f}", col1_bins)),
+        labels=list(map(lambda x: f"{x:.2f}", col1_bins)),
         fontsize=cbar_args.get("font_size", "x-small"),
     )
     cbar_ax.set_yticks(
         np.arange(k + 1) - 0.5,
-        labels=list(map(lambda x: f"{x:.0f}", col2_bins)),
+        labels=list(map(lambda x: f"{x:.2f}", col2_bins)),
         fontsize=cbar_args.get("font_size", "x-small"),
     )
 
     cbar_ax.imshow(bivariate_palette, origin="lower")
 
-    return bivariate_palette, cbar_ax
+    return ax, bivariate_palette, cbar_ax
