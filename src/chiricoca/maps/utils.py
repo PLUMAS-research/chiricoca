@@ -18,10 +18,11 @@ def geographical_labels(
     format_func=None,
     bounds=None,
     displacements=None,
+    va='center',
+    ha='center'
 ):
     labels = []
-    if not displacements:
-        displacements = {}
+
     for idx, row in geodf.iterrows():
         centroid = row.geometry.centroid
 
@@ -38,14 +39,18 @@ def geographical_labels(
         if format_func is not None:
             label = format_func(label)
 
-        disp = displacements.get(label, (0, 0))
+        if displacements is not None:
+            if type(displacements) == dict:
+                disp = displacements.get(label, (0, 0))
+            else:
+                disp = displacements
 
         t = ax.text(
             centroid.x + disp[0],
             centroid.y + disp[1],
             label,
-            va="center",
-            horizontalalignment="center",
+            va=va,
+            horizontalalignment=ha,
             fontsize=font_size,
             fontweight=font_weight,
             color=color,
