@@ -75,7 +75,6 @@ def build_dual_bubble(pos=[0, 0], left_percentage=50, radio=1):
 
 
 def bubble_plot(
-    ax,
     df,
     position_column,
     radius_column,
@@ -94,6 +93,8 @@ def bubble_plot(
     fontname=None,
     fontstyle=None,
     random_state=1990,
+    ax=None,
+    fig_args=None
 ):
     """
     Crea un gráfico de burbujas a partir de los datos entregados.
@@ -161,6 +162,13 @@ def bubble_plot(
     split_collection_r : objeto PatchCollection de matplotlib, opcional
         La colección de parches utilizada para dibujar las burbujas duales en el lado derecho del gráfico. Devuelto solo si dual es True.
     """
+
+    if ax is None:
+        if fig_args is None:
+            fig_args = {}
+
+        fig, ax = plt.subplots(**fig_args)
+
     np.random.seed(random_state)
     df = df.reset_index()
     space = pymunk.Space()
