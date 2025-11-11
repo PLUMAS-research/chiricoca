@@ -38,6 +38,34 @@ def quantile_transform_columns(df, n_quantiles=10, output_distribution="uniform"
     )
 
 
+def tfidf(df, norm="l1", smooth_idf=False, sublinear_tf=False):
+    # TF con suavizado logarítmico opcional
+    if sublinear_tf:
+        tf = np.log1p(df)  # log(1 + frecuencia)
+    else:
+        tf = df
+    
+    # IDF
+    n_docs = len(df)
+    doc_freq = (df > 0).sum(axis=0)
+    
+    if smooth_idf:
+        idf = np.log((n_docs + 1) / (doc_freq + 1)) + 1
+    else:
+        idf = np.log(n_docs / doc_freq)
+    
+    # TF-IDF
+    result = tf * idf
+    
+    # Normalización al final
+    if norm == "l1":
+        result = result.div(result.sum(axis=1), axis=0)
+    elif norm == "l2":
+        result = result.div(np.sqrt((result ** 2).sum(axis=1)), axis=0)
+    
+    return result
+
+
 def weighted_mean(df, value_column, weighs_column):
     weighted_sum = (df[value_column] * df[weighs_column]).sum()
     return weighted_sum / df[weighs_column].sum()
