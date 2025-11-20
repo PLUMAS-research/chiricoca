@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project]
+name = "chiricoca"
+version = "0.1"
+description = "Análisis y Visualización, Educación y Soporte"
+authors = [{ name = "Eduardo Graells-Garrido", email = "egraells@dcc.uchile.cl" }]
+requires-python = ">=3.10"
+
+dependencies = [
+  "configparser",
+  "black",
+  "matplotlib",
+  "ipympl",
+  "seaborn>=0.13",
+  "pandas",
+  "libpysal",
+  "esda",
+  "splot",
+  "spreg",
+  "spglm",
+  "access",
+  "mgwr",
+  "mapclassify",
+  "statsmodels",
+  "spectra",
+  "descartes",
+  "scikit-learn<1.6",
+  "wordcloud",
+  "cytoolz",
+  "jupyter",
+  "ipykernel",
+  "gensim",
+  "python-rapidjson",
+  "umap-learn",
+  "hdbscan",
+  "regex",
+  "nltk",
+  "contextily",
+  "sphinx",
+  "spacy",
+  "dask",
+  "tqdm",
+  "future",
+  "python-ternary",
+  "python-dotenv",
+  "shap"
+]
+
+[project.optional-dependencies]
+geo = [
+  "mapclassify", "libpysal", "esda", "splot", "spreg", "spglm", "mgwr", "contextily"
+]
+docs = ["sphinx", "sphinx-basic-ng", "furo"]
+nlp = ["spacy", "nltk", "gensim", "pysentimiento"]
+viz = ["wordcloud", "matplotlib", "seaborn>=0.13"]
+pip_extras = [
+  "bezier",
+  "scattertext",
+  "adjustText",
+  "matplotlib-scalebar",
+  "pymunk",
+  "xlrd",
+  "flashtext",
+  "alphashape",
+  "s2sphere",
+  "lxml",
+  "pyreadstat",
+  "KDEpy",
+  "formulaic",
+  "interface_meta",
+  "pysentimiento"
+]

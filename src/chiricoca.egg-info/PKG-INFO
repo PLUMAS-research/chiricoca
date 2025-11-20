@@ -1,0 +1,81 @@
+Metadata-Version: 2.4
+Name: chiricoca
+Version: 0.1
+Summary: Análisis y Visualización, Educación y Soporte
+Author-email: Eduardo Graells-Garrido <egraells@dcc.uchile.cl>
+Requires-Python: >=3.10
+Requires-Dist: configparser
+Requires-Dist: black
+Requires-Dist: matplotlib
+Requires-Dist: ipympl
+Requires-Dist: seaborn>=0.13
+Requires-Dist: pandas
+Requires-Dist: libpysal
+Requires-Dist: esda
+Requires-Dist: splot
+Requires-Dist: spreg
+Requires-Dist: spglm
+Requires-Dist: access
+Requires-Dist: mgwr
+Requires-Dist: mapclassify
+Requires-Dist: statsmodels
+Requires-Dist: spectra
+Requires-Dist: descartes
+Requires-Dist: scikit-learn<1.6
+Requires-Dist: wordcloud
+Requires-Dist: cytoolz
+Requires-Dist: jupyter
+Requires-Dist: ipykernel
+Requires-Dist: gensim
+Requires-Dist: python-rapidjson
+Requires-Dist: umap-learn
+Requires-Dist: hdbscan
+Requires-Dist: regex
+Requires-Dist: nltk
+Requires-Dist: contextily
+Requires-Dist: sphinx
+Requires-Dist: spacy
+Requires-Dist: dask
+Requires-Dist: tqdm
+Requires-Dist: future
+Requires-Dist: python-ternary
+Requires-Dist: python-dotenv
+Requires-Dist: shap
+Provides-Extra: geo
+Requires-Dist: mapclassify; extra == "geo"
+Requires-Dist: libpysal; extra == "geo"
+Requires-Dist: esda; extra == "geo"
+Requires-Dist: splot; extra == "geo"
+Requires-Dist: spreg; extra == "geo"
+Requires-Dist: spglm; extra == "geo"
+Requires-Dist: mgwr; extra == "geo"
+Requires-Dist: contextily; extra == "geo"
+Provides-Extra: docs
+Requires-Dist: sphinx; extra == "docs"
+Requires-Dist: sphinx-basic-ng; extra == "docs"
+Requires-Dist: furo; extra == "docs"
+Provides-Extra: nlp
+Requires-Dist: spacy; extra == "nlp"
+Requires-Dist: nltk; extra == "nlp"
+Requires-Dist: gensim; extra == "nlp"
+Requires-Dist: pysentimiento; extra == "nlp"
+Provides-Extra: viz
+Requires-Dist: wordcloud; extra == "viz"
+Requires-Dist: matplotlib; extra == "viz"
+Requires-Dist: seaborn>=0.13; extra == "viz"
+Provides-Extra: pip-extras
+Requires-Dist: bezier; extra == "pip-extras"
+Requires-Dist: scattertext; extra == "pip-extras"
+Requires-Dist: adjustText; extra == "pip-extras"
+Requires-Dist: matplotlib-scalebar; extra == "pip-extras"
+Requires-Dist: pymunk; extra == "pip-extras"
+Requires-Dist: xlrd; extra == "pip-extras"
+Requires-Dist: flashtext; extra == "pip-extras"
+Requires-Dist: alphashape; extra == "pip-extras"
+Requires-Dist: s2sphere; extra == "pip-extras"
+Requires-Dist: lxml; extra == "pip-extras"
+Requires-Dist: pyreadstat; extra == "pip-extras"
+Requires-Dist: KDEpy; extra == "pip-extras"
+Requires-Dist: formulaic; extra == "pip-extras"
+Requires-Dist: interface_meta; extra == "pip-extras"
+Requires-Dist: pysentimiento; extra == "pip-extras"

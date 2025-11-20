@@ -1,0 +1,45 @@
+name: chiricoca 
+channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - scipy<1.13
+  - scikit-learn<1.6
+  - cython
+  - matplotlib
+  - seaborn>=0.13
+  - jupyter
+  - ipykernel
+  - ipympl
+  - graphviz
+  - gdal
+  - geopandas
+  - shapely            
+  - pygeos             
+  - r5py
+  - pyrosm==0.6.2
+  - h3-py
+  - pytorch
+  - pytorch-cuda
+  - pip:
+      - bezier
+      - scattertext
+      - adjustText
+      - matplotlib-scalebar
+      - pymunk
+      - xlrd
+      - flashtext
+      - alphashape
+      - s2sphere
+      - lxml
+      - sphinx-basic-ng
+      - furo
+      - pyreadstat
+      - KDEpy
+      - formulaic
+      - interface_meta
+      - pysentimiento
