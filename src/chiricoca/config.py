@@ -30,16 +30,22 @@ def setup_style(
         if font_family in mpl.font_manager.get_font_names():
             mpl.rcParams["font.family"] = font_family
     else:
-        font_path = (
-            Path(os.path.dirname(__file__)) / "assets" / "RobotoCondensed-Regular.ttf"
-        )
-        font_manager.fontManager.addfont(font_path)
-        prop = font_manager.FontProperties(fname=font_path)
+        
 
         mpl.rcParams["font.family"] = "sans-serif"
-        mpl.rcParams["font.sans-serif"] = prop.get_name()
+        mpl.rcParams["font.sans-serif"] = get_default_font_properties().get_name()
 
     if formatter_limits:
         mpl.rcParams["axes.formatter.limits"] = (-99, 99)
 
     pd.set_option("display.max_rows", max_pandas_rows)
+
+
+def get_default_font_path():
+    return Path(os.path.dirname(__file__)) / "assets" / "RobotoCondensed-Regular.ttf"
+
+
+def get_default_font_properties():
+    font_path = get_default_font_path()
+    font_manager.fontManager.addfont(font_path)
+    return font_manager.FontProperties(fname=font_path)
