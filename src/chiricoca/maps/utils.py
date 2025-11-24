@@ -36,14 +36,16 @@ def geographical_labels(
         else:
             label = row[column]
 
-        if format_func is not None:
-            label = format_func(label)
-
         if displacements is not None:
             if type(displacements) == dict:
                 disp = displacements.get(label, (0, 0))
             else:
                 disp = displacements
+        else:
+            disp = (0, 0)
+
+        if format_func is not None:
+            label = format_func(label)
 
         t = ax.text(
             centroid.x + disp[0],
