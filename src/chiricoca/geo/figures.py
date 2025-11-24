@@ -2,6 +2,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import contextily as cx
 
+def set_axis_aspect(ax, geodf):
+    # code from geopandas
+    if geodf.crs and geodf.crs.is_geographic:
+        bounds = geodf.total_bounds
+        y_coord = np.mean([bounds[1], bounds[3]])
+        ax.set_aspect(1 / np.cos(y_coord * np.pi / 180))
+        # formula ported from R package sp
+        # https://github.com/edzer/sp/blob/master/R/mapasp.R
+    else:
+        ax.set_aspect("equal")
 
 def figure_from_geodataframe(
     geodf,
@@ -23,15 +33,7 @@ def figure_from_geodataframe(
         ax.set_xlim([bbox[0], bbox[2]])
         ax.set_ylim([bbox[1], bbox[3]])
 
-        # code from geopandas
-        if geodf.crs and geodf.crs.is_geographic:
-            bounds = geodf.total_bounds
-            y_coord = np.mean([bounds[1], bounds[3]])
-            ax.set_aspect(1 / np.cos(y_coord * np.pi / 180))
-            # formula ported from R package sp
-            # https://github.com/edzer/sp/blob/master/R/mapasp.R
-        else:
-            ax.set_aspect("equal")
+        set_axis_aspect(ax, geodf)
 
     if remove_axes:
         ax.set_axis_off()
