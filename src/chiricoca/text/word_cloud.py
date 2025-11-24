@@ -64,7 +64,7 @@ def wordcloud(
         max_font_size = int(ax.get_window_extent().height * size_scaling * 0.66)
 
     if fontname is None:
-        font_path = fontname = get_default_font_path()
+        font_path = matplotlib.font_manager.findfont(get_default_font_path())
     else:
         font_path = matplotlib.font_manager.findfont(fontname)
 
