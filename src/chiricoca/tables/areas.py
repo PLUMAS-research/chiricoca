@@ -3,35 +3,170 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from chiricoca.base.collections import LabelCollection
+from chiricoca.base.sorting import _get_sort_key
+
+
+def _get_sort_key_temporal(df, sort_by):
+    """
+    Calcula la clave de ordenamiento para columnas de un streamgraph.
+    Extiende _get_sort_key con criterios temporales.
+    
+    Parameters
+    ----------
+    df : DataFrame
+        Datos a ordenar. Índice es el eje temporal, columnas son categorías.
+    sort_by : str o list
+        Criterio de ordenamiento:
+        - 'sum': suma total
+        - 'max': valor máximo
+        - 'name': alfabético
+        - 'entropy': entropía temporal (menor = más concentrado en el tiempo)
+        - 'gini': coeficiente de Gini temporal
+        - 'peak_time': momento donde alcanza el máximo
+        - 'first_peak': momento donde supera el 50% del máximo
+        - 'onset': momento donde supera el 10% del máximo
+        - str: nombre de fila específica (valor en ese momento)
+        - list: orden explícito
+    
+    Returns
+    -------
+    pd.Series o None
+    """
+    if isinstance(sort_by, list):
+        return None
+    
+    if sort_by == 'peak_time':
+        return df.idxmax()
+    
+    if sort_by == 'first_peak':
+        threshold = df.max() * 0.5
+        def first_above(col):
+            above = df.index[df[col] >= threshold[col]]
+            return above[0] if len(above) > 0 else df.index[-1]
+        return pd.Series({col: first_above(col) for col in df.columns})
+    
+    if sort_by == 'onset':
+        threshold = df.max() * 0.1
+        def first_above(col):
+            above = df.index[df[col] >= threshold[col]]
+            return above[0] if len(above) > 0 else df.index[-1]
+        return pd.Series({col: first_above(col) for col in df.columns})
+    
+    # Para criterios no temporales, usar _get_sort_key sobre la transpuesta
+    return _get_sort_key(df.T, sort_by, axis='rows')
+
+
+def _build_color_dict(df, palette, highlight, highlight_palette, colors, default_color):
+    """
+    Construye el diccionario de colores para las áreas.
+    
+    Precedencia:
+    1. colors (dict explícito)
+    2. highlight + highlight_palette
+    3. palette (o default_color para no resaltadas)
+    """
+    n_cols = len(df.columns)
+    color_dict = {}
+    
+    # Normalizar highlight a lista
+    if highlight is None:
+        highlight_list = []
+    elif isinstance(highlight, str):
+        highlight_list = [highlight]
+    else:
+        highlight_list = list(highlight)
+    
+    # Generar colores base
+    if highlight_list:
+        # Si hay highlight, el resto va en palette base (o default_color)
+        if default_color is not None:
+            base_colors = [default_color] * n_cols
+        elif isinstance(palette, str):
+            base_colors = [sns.color_palette(palette, 1)[0]] * n_cols
+        else:
+            base_colors = [palette[0]] * n_cols
+        
+        # Colores para highlight
+        n_highlight = len(highlight_list)
+        if isinstance(highlight_palette, str):
+            hl_colors = sns.color_palette(highlight_palette, n_colors=n_highlight)
+        else:
+            hl_colors = highlight_palette[:n_highlight]
+        
+        hl_color_map = dict(zip(highlight_list, hl_colors))
+        
+        for i, col in enumerate(df.columns):
+            if col in hl_color_map:
+                color_dict[col] = hl_color_map[col]
+            else:
+                color_dict[col] = base_colors[i]
+    else:
+        # Sin highlight, usar palette normal
+        if isinstance(palette, str):
+            pal_colors = sns.color_palette(palette, n_colors=n_cols)
+        else:
+            pal_colors = palette[:n_cols]
+        color_dict = dict(zip(df.columns, pal_colors))
+    
+    # Override con colors explícitos
+    if colors is not None:
+        for col, c in colors.items():
+            if col in color_dict:
+                color_dict[col] = c
+    
+    return color_dict
+
+
+def _draw_legend_right(ax, df, stream_stack, stream_first_line, color_dict, legend_args):
+    """Dibuja leyenda lateral con líneas de codos."""
+    from chiricoca.base.labels import layout_labels_vertical
+    
+    # Posiciones Y en el extremo derecho
+    last_idx = -1
+    positions = {}
+    
+    # Primera área
+    y_center = (stream_first_line[last_idx] + stream_stack[0, last_idx]) / 2
+    positions[df.columns[0]] = y_center
+    
+    # Resto de áreas
+    for i in range(1, len(df.columns)):
+        y_center = (stream_stack[i-1, last_idx] + stream_stack[i, last_idx]) / 2
+        positions[df.columns[i]] = y_center
+    
+    x_right = df.index[-1]
+    
+    # Layout para evitar colisiones
+    labels = list(df.columns)
+    y_orig = [positions[col] for col in labels]
+    
+    fontsize = legend_args.get('fontsize', 9)
+    y_final = layout_labels_vertical(ax, y_orig, labels, fontsize=fontsize)
+    
+    # Dibujar
+    x_offset = (df.index[-1] - df.index[0]) * 0.02
+    x_label = x_right + x_offset * 3
+    
+    for col, y_o, y_f in zip(labels, y_orig, y_final):
+        color = color_dict[col]
+        
+        # Cuadrado de color
+        ax.plot(x_label - x_offset * 0.5, y_f, 's', color=color, 
+                markersize=8, clip_on=False)
+        
+        # Texto
+        ax.text(x_label, y_f, col, va='center', fontsize=fontsize, clip_on=False)
+        
+        # Línea con codo si hay desplazamiento
+        if abs(y_f - y_o) > 0.01:
+            ax.plot([x_right, x_right + x_offset, x_label - x_offset], 
+                    [y_o, y_o, y_f],
+                    color='gray', lw=0.5, clip_on=False)
 
 
 def stacked_areas(ax, df, baseline="zero", color_dict=None, **kwargs):
     """
-    Dibuja la visualización de la distribución cumulativa de distintas categorías a lo largo de una variable continua y obtiene
-    los parámetros de la figura necesarios para generar un gráfico con la función `streamgraph`_.
-
-    Parameters
-    ----------
-    ax : matplotlib.axes
-        El eje en el cual se dibujará el gráfico.
-    df : DataFrame
-        Un DataFrame que contiene los datos para generar el gráfico.
-    baseline : str, default="zero", opcional
-        El método utilizado para calcular la línea base de las áreas apiladas.
-    color_dict : dict, default=None, opcional
-        Un diccionario que mapea los nombres de las categorías a los colores a utilizar para rellenar las áreas corresppondientes.
-    **kwargs
-        Argumentos adicionales que permiten personalizar el gráfico.
-        Una lista completa de las opciones disponibles se encuentra en la documentación de `Matplotlib <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.fill_between.html>`__.
-
-    Returns
-    -------
-    x : ndarray
-        Arreglo que contiene los valores en el eje x del gráfico.
-    first_line : ndarray
-        Arreglo que contiene los valores de la primera línea base de las áreas apiladas.
-    stack : ndarray
-        Arreglo que contiene los valores de las áreas apiladas.
+    Dibuja áreas apiladas y retorna los parámetros de la figura.
     """
     stack = np.cumsum(df.T.values, axis=0)
     x = df.index.values
@@ -59,83 +194,103 @@ def stacked_areas(ax, df, baseline="zero", color_dict=None, **kwargs):
 def streamgraph(
     df,
     baseline="wiggle",
+    # Ordenamiento
+    sort_areas='sum',
+    sort_areas_ascending=False,
+    # Colores
+    palette="husl",
+    highlight=None,
+    highlight_palette="magma",
+    colors=None,
+    default_color=None,
+    edgecolor="black",
+    linewidth=0.1,
+    # Etiquetas
     labels=True,
     label_threshold=None,
     label_args=None,
-    fig=None,
-    facecolor=None,
-    edgecolor="black",
-    linewidth=0.1,
-    palette="husl",
-    area_colors=None,
-    area_args=None,
+    label_rolling_window=None,
     avoid_label_collisions=False,
     outline_labels=True,
     label_collision_args=None,
-    label_rolling_window=None,
-    sort_areas="sum",
-    normalize=False,
-    ax=None,
-    fig_args=None,
+    # Leyenda
     legend=False,
     legend_args=None,
-    legend_loc="outer",
+    # Normalización y límites
+    normalize=False,
+    skip_set_xlim=False,
+    skip_set_ylim=False,
+    # Figura
+    ax=None,
+    fig=None,
+    fig_args=None,
+    **area_args,
 ):
     """
-    Genera un gráfico **streamgraph** a partir de los datos de un dataframe.
-    Este gráfico muestra el cambio de composición o distribución de distitnas categorías a lo largo del tiempo.
-    Cada categoría es representada por una franja de un color que fluye por el eje horizontal, que representa una variable continua
-    como por ejemplo el paso del tiempo. La altura de la franja en un punto representa la proporción relativa de esa categoría en ese momento.
-    Las franjas están apiladas una encima de la otra, por lo que la altura total de las franjas en un punto indica el cumulativo de todas las categorias.
-
+    Genera un streamgraph a partir de un dataframe.
+    
     Parameters
     ----------
     df : DataFrame
-        DataFrame que contiene los datos a visualizar. Cada columna es una categoría.
-    baseline : str, default="wiggle", opcional
-        El método utilizado para calcular la línea base del streamgraph.
-    labels : bool, default=True, opcional
-        Indica si se deben mostrar etiquetas en el gráfico.
-    label_threshold : float, default=None, opcional
-        Umbral para posicionar las etiquetas en el gráfico. Si es None, se calcula automáticamente.
-    label_args : dict, default=None, opcional
-        Argumentos adicionales para personalizar las etiquetas.
-    fig : Figure, default=None, opcional
-        La figura en la cual se genera el gráfico. Se utiliza para el manejo de colisiones de etiquetas.
-    facecolor: string, default=None, opcional
-        Un color para pintar todas las áreas. Su uso anula el de palette y area_colors.
-    edgecolor: string, default="black", opcional
-        Un color para pintar los bordes de las áreas.
-    linewidth: float, default=0.1, opcional
-        El grosor de la línea borde de cada área.
-    palette: string, default="husl", opcional
-        Un nombre de paleta de colores para colorear cada área. Solo se utiliza si area_colors es None.
-    area_colors : dict, default=None, opcional
-        Un diccionario que mapea los nombres de las categorías a los colores a utilizar para rellenar las áreas corresppondientes.
-    area_args : dict, default=None, opcional
-        Argumentos adicionales que permiten personalizar el gráfico.
-    avoid_label_collisions : bool, default=False, opcional
-        Indica si se deben evitar colisiones de etiquetas en el gráfico.
-    outline_labels : bool, default=True, opcional
-        Indica si se deben resaltar las etiquetas mediante un contorno.
-    label_collision_args : dict, default=None, opcional
-        Argumentos adicionales para manejar las colisiones de etiquetas.
-    sort_areas : str, default="sum", opcional
-        Método para reordenar las categorías. Opciones: "sum", "max", "peak_time", "none".
-    normalize : bool, default=False, opcional
-        Si True, normaliza cada fila para que sume 1 y ajusta automáticamente los límites del eje y.
-    ax : matplotlib.axes, default=None, opcional
-        El eje en el cual se dibujará el gráfico. Si es None, se crea automáticamente.
-    fig_args : dict, default=None, opcional
+        Datos a visualizar. Índice es el eje temporal, columnas son categorías.
+    baseline : str, default="wiggle"
+        Método para calcular la línea base: "zero" o "wiggle".
+    sort_areas : str, list o False
+        Ordenamiento de áreas. Opciones: 'sum', 'max', 'name', 'entropy', 'gini',
+        'peak_time', 'first_peak', 'onset', nombre de fila, lista explícita, o False.
+    sort_areas_ascending : bool
+        Si True, ordena ascendente.
+    palette : str o list
+        Paleta de colores base.
+    highlight : str o list
+        Áreas a resaltar con highlight_palette.
+    highlight_palette : str o list
+        Paleta para áreas resaltadas.
+    colors : dict
+        Diccionario de colores explícitos (tiene precedencia).
+    default_color : str
+        Color para áreas no resaltadas cuando highlight está activo.
+    edgecolor : str
+        Color de borde de las áreas.
+    linewidth : float
+        Grosor del borde.
+    labels : bool o 'highlight'
+        True muestra todas las etiquetas, 'highlight' solo las resaltadas.
+    label_threshold : float
+        Umbral mínimo para mostrar etiquetas.
+    label_args : dict
+        Argumentos para las etiquetas.
+    label_rolling_window : int
+        Ventana para suavizar al calcular posición de etiquetas.
+    avoid_label_collisions : bool
+        Si True, ajusta posiciones para evitar colisiones.
+    outline_labels : bool
+        Si True, añade contorno a las etiquetas.
+    label_collision_args : dict
+        Argumentos para el ajuste de colisiones.
+    legend : bool o 'right'
+        False: sin leyenda. True: leyenda tradicional. 'right': leyenda lateral.
+    legend_args : dict
+        Argumentos para la leyenda.
+    normalize : bool
+        Si True, normaliza cada fila para que sume 1.
+    skip_set_xlim : bool
+        Si True, no ajusta xlim automáticamente.
+    skip_set_ylim : bool
+        Si True, no ajusta ylim automáticamente.
+    ax : matplotlib.axes
+        Eje donde dibujar. Si None, se crea uno nuevo.
+    fig : Figure
+        Figura (necesaria para avoid_label_collisions).
+    fig_args : dict
         Argumentos para crear la figura si ax es None.
-    legend : bool, default=False, opcional
-        Si True, muestra una leyenda con las categorías y sus colores.
-    legend_args : dict, default=None, opcional
-        Argumentos adicionales para personalizar la leyenda.
-    legend_loc : str, default="upper right", opcional
-        Ubicación de la leyenda. Si es "outer", se coloca fuera del área del gráfico.
+    **area_args
+        Argumentos adicionales para fill_between.
+    
+    Returns
+    -------
+    ax : matplotlib.axes
     """
-
     if ax is None:
         if fig_args is None:
             fig_args = {}
@@ -143,9 +298,6 @@ def streamgraph(
 
     if label_args is None:
         label_args = {}
-
-    if area_args is None:
-        area_args = {}
 
     if legend_args is None:
         legend_args = {}
@@ -157,95 +309,97 @@ def streamgraph(
 
     df = df.fillna(0).astype(float)
 
-    # Normalizar datos si se solicita
+    # Normalizar
     if normalize:
         df = df.div(df.sum(axis=1), axis=0).fillna(0)
 
-    # Reordenar columnas según el criterio especificado
-    if sort_areas is not None and sort_areas != "none":
-        if sort_areas == "sum":
-            # Ordenar por suma total (de mayor a menor)
-            column_order = df.sum().sort_values(ascending=False).index
-        elif sort_areas == "max":
-            # Ordenar por valor máximo
-            column_order = df.max().sort_values(ascending=False).index
-        elif sort_areas == "peak_time":
-            # Ordenar por el momento donde cada categoría alcanza su máximo
-            peak_times = df.idxmax()
-            column_order = peak_times.sort_values().index
+    # Ordenar columnas
+    if sort_areas and sort_areas != 'none':
+        sort_key = _get_sort_key_temporal(df, sort_areas)
+        if sort_key is not None:
+            column_order = sort_key.sort_values(ascending=sort_areas_ascending).index
         else:
-            column_order = df.columns
-
+            # sort_areas es una lista
+            column_order = [c for c in sort_areas if c in df.columns]
         df = df[column_order]
 
-    # Calcular umbral automático para etiquetas si no se especifica
+    # Umbral automático para etiquetas
     if label_threshold is None:
         label_threshold = _auto_label_threshold(df, normalize)
 
-    # Configurar parámetros de área con valores por defecto
-    # Estos parámetros se pasan directamente a fill_between via **kwargs
+    # Parámetros de área
     if edgecolor is not None and "edgecolor" not in area_args:
         area_args["edgecolor"] = edgecolor
     if linewidth is not None and "linewidth" not in area_args:
         area_args["linewidth"] = linewidth
 
-    # Manejo mejorado de colores
-    if area_colors is None:
-        if palette is not None:
-            colors = sns.color_palette(palette, n_colors=len(df.columns))
-            area_colors = dict(zip(df.columns.values, colors))
-        else:
-            # Fallback a colores por defecto de matplotlib
-            colors = [f"C{i}" for i in range(len(df.columns))]
-            area_colors = dict(zip(df.columns.values, colors))
-
-    stream_x, stream_first_line, stream_stack = stacked_areas(
-        ax, df, color_dict=area_colors, baseline=baseline, **area_args
+    # Construir diccionario de colores
+    color_dict = _build_color_dict(
+        df, palette, highlight, highlight_palette, colors, default_color
     )
 
-    ax.set_xlim([df.index.min(), df.index.max()])
+    # Dibujar áreas
+    stream_x, stream_first_line, stream_stack = stacked_areas(
+        ax, df, color_dict=color_dict, baseline=baseline, **area_args
+    )
 
-    # Configurar límites del eje y automáticamente
-    if normalize:
-        ax.set_ylim([0, 1])
-    else:
-        # Para datos no normalizados, usar los valores mínimo y máximo del stack
-        y_min = np.min(stream_first_line)
-        y_max = np.max(stream_stack[-1, :])
-        margin = (y_max - y_min) * 0.05  # 5% de margen
-        y_min_lim = y_min - margin if baseline != "zero" else y_min
-        ax.set_ylim([y_min_lim, y_max + margin])
+    # Límites
+    if not skip_set_xlim:
+        ax.set_xlim([df.index.min(), df.index.max()])
 
+    if not skip_set_ylim:
+        if normalize:
+            ax.set_ylim([0, 1])
+        else:
+            y_min = np.min(stream_first_line)
+            y_max = np.max(stream_stack[-1, :])
+            margin = (y_max - y_min) * 0.05
+            y_min_lim = y_min - margin if baseline != "zero" else y_min
+            ax.set_ylim([y_min_lim, y_max + margin])
+
+    # Etiquetas
     if labels:
+        # Determinar qué columnas etiquetar
+        if labels == 'highlight' and highlight is not None:
+            if isinstance(highlight, str):
+                cols_to_label = {highlight}
+            else:
+                cols_to_label = set(highlight)
+        else:
+            cols_to_label = set(df.columns)
+
         if label_rolling_window is None:
             label_rolling_window = _auto_rolling_window(df)
 
         _df = df.rolling(label_rolling_window).median()
-
         x_to_idx = dict(zip(_df.index, range(len(df))))
         max_x = _df.idxmax().map(x_to_idx)
 
         label_collection = LabelCollection()
 
+        # Primera área
         max_idx = max_x.values[0]
         y_value = stream_stack[0, max_idx] - stream_first_line[max_idx]
+        col_name = df.columns[0]
 
-        if y_value >= label_threshold:
+        if y_value >= label_threshold and col_name in cols_to_label:
             label_collection.add_text(
-                df.columns[0],
+                col_name,
                 stream_x[max_idx],
                 stream_first_line[max_idx] * 0.5 + stream_stack[0, max_idx] * 0.5,
             )
 
+        # Resto de áreas
         for i in range(1, len(df.columns)):
             max_idx = max_x.values[i]
             y_value = stream_stack[i, max_idx] - stream_stack[i - 1, max_idx]
+            col_name = df.columns[i]
 
-            if y_value < label_threshold:
+            if y_value < label_threshold or col_name not in cols_to_label:
                 continue
 
             label_collection.add_text(
-                df.columns[i],
+                col_name,
                 stream_x[max_idx],
                 stream_stack[i, max_idx] * 0.5 + stream_stack[i - 1, max_idx] * 0.5,
             )
@@ -261,87 +415,62 @@ def streamgraph(
             adjustment_args=label_collision_args,
         )
 
-    # Agregar leyenda si se solicita
+    # Leyenda
     if legend:
-        handles = []
-        labels_list = []
-
-        # Invertir el orden para que coincida con la visualización (de abajo hacia arriba)
-        for col in reversed(df.columns):
-            color = area_colors.get(col, "C0")
-            handles.append(
-                plt.Rectangle(
-                    (0, 0),
-                    1,
-                    1,
-                    facecolor=color,
-                    edgecolor=area_args.get("edgecolor", "none"),
-                    linewidth=area_args.get("linewidth", 0),
-                )
-            )
-            labels_list.append(col)
-
-        # Configurar argumentos por defecto para la leyenda
-        legend_defaults = {"frameon": False}
-
-        # Manejar ubicación especial 'outer'
-        if legend_loc == "outer":
-            legend_defaults["bbox_to_anchor"] = (1.0, 0.0, 0.1, 1.0)
-            legend_defaults["loc"] = "center left"
+        if legend == 'right':
+            _draw_legend_right(ax, df, stream_stack, stream_first_line, 
+                             color_dict, legend_args)
         else:
-            legend_defaults["loc"] = legend_loc
+            # Leyenda tradicional
+            handles = []
+            labels_list = []
+            
+            for col in reversed(df.columns):
+                color = color_dict.get(col, "C0")
+                handles.append(
+                    plt.Rectangle((0, 0), 1, 1, facecolor=color,
+                                 edgecolor=area_args.get("edgecolor", "none"),
+                                 linewidth=area_args.get("linewidth", 0))
+                )
+                labels_list.append(col)
 
-        # Aplicar argumentos personalizados
-        legend_defaults.update(legend_args)
-
-        ax.legend(handles, labels_list, **legend_defaults)
+            legend_defaults = {"frameon": False}
+            legend_defaults.update(legend_args)
+            ax.legend(handles, labels_list, **legend_defaults)
 
     return ax
 
 
 def _auto_rolling_window(df):
-    """Determina automáticamente el tamaño de la rolling window"""
+    """Determina automáticamente el tamaño de la rolling window."""
     n_points = len(df)
-
-    # Ventana base: 2-5% del total de puntos
     base_window = max(3, int(n_points * 0.03))
 
-    # Ajustar por variabilidad: medir "rugosidad" de los datos
     variabilities = []
     for col in df.columns:
-        # Calcular diferencias consecutivas normalizadas
         series = df[col]
-        if series.sum() > 0:  # Evitar divisiones por cero
+        if series.sum() > 0:
             diffs = np.abs(series.diff()).fillna(0)
-            # Normalizar por el valor medio de la serie
             variability = diffs.mean() / (series.mean() + 1e-8)
             variabilities.append(variability)
 
     if variabilities:
         avg_variability = np.mean(variabilities)
-        # Si hay mucha variabilidad, usar ventana más grande
         variability_factor = min(3.0, max(0.5, avg_variability * 10))
         adjusted_window = int(base_window * variability_factor)
     else:
         adjusted_window = base_window
 
-    # Límites razonables
     min_window = 3
-    max_window = min(n_points // 10, 200)  # Máximo 10% de los datos o 200 puntos
+    max_window = min(n_points // 10, 200)
 
     return max(min_window, min(max_window, adjusted_window))
 
 
 def _auto_label_threshold(df, normalize):
-    """Calcula automáticamente el umbral para mostrar etiquetas"""
+    """Calcula automáticamente el umbral para mostrar etiquetas."""
     if normalize:
-        # Para datos normalizados, usar un porcentaje del total
-        # Mostrar etiquetas solo para áreas que representen al menos 5% en promedio
-        threshold = 0.05
+        return 0.05
     else:
-        # Para datos no normalizados, calcular basado en la magnitud de los datos
         mean_area_size = df.sum(axis=0).mean()
-        # Mostrar etiquetas para áreas que sean al menos 10% del tamaño promedio
-        threshold = mean_area_size * 0.001
-
-    return threshold
+        return mean_area_size * 0.001

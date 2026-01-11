@@ -19,6 +19,7 @@ def summary(G, root_node=None):
         "is_tree": nx.is_tree(G),
         "is_directed": nx.is_directed(G),
         "n_connected_components": n_components,
+        'clustering_coefficient': nx.average_clustering(G)
     }
 
     if result["is_tree"] and root_node is not None:

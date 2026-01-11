@@ -2,6 +2,24 @@ import h3
 import geopandas as gpd
 from shapely.geometry import Polygon
 
+def h3_grid_from_ids(cell_ids):
+    h3grid = (
+        gpd.GeoDataFrame(
+            {"h3_cell_id": list(map(str, cell_ids))},
+            geometry=[
+                Polygon(
+                    list(
+                        map(lambda x: tuple(reversed(x)), h3.cell_to_boundary(cell_id))
+                    )
+                )
+                for cell_id in cell_ids
+            ],
+            crs="epsg:4326",
+        )
+        .set_index("h3_cell_id")
+    )
+
+    return h3grid    
 
 def h3_grid_from_bounds(bounds, extra_margin=0.0, grid_level=12, crs="epsg:4326"):
     class MockGeo:
@@ -37,21 +55,4 @@ def h3_grid_from_bounds(bounds, extra_margin=0.0, grid_level=12, crs="epsg:4326"
         res=grid_level,
     )
 
-    h3grid = (
-        gpd.GeoDataFrame(
-            {"h3_cell_id": list(map(str, cell_ids))},
-            geometry=[
-                Polygon(
-                    list(
-                        map(lambda x: tuple(reversed(x)), h3.cell_to_boundary(cell_id))
-                    )
-                )
-                for cell_id in cell_ids
-            ],
-            crs="epsg:4326",
-        )
-        .to_crs(crs)
-        .set_index("h3_cell_id")
-    )
-
-    return h3grid
+    return h3_grid_from_ids(list(map(str, cell_ids))).to_crs(crs)

@@ -100,8 +100,8 @@ def north_arrow(
     )
 
 
-def geographical_scale(ax, location="lower left"):
-    ax.add_artist(ScaleBar(1, location=location))
+def geographical_scale(ax, *args, **kwargs):
+    ax.add_artist(ScaleBar(*args, **kwargs))
 
 
 def add_basemap(

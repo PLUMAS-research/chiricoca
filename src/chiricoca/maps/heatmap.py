@@ -11,7 +11,7 @@ def heat_map(
     geodf,
     weight=None,
     low_threshold=0,
-    max_threshold=1.0,
+    max_threshold=None,
     n_levels=5,
     alpha=1.0,
     palette="magma",
@@ -47,12 +47,15 @@ def heat_map(
         weight_column=weight,
     )
 
-    norm_heat = heat[2] / heat[2].max()
+    norm_heat = heat[2]# / heat[2].max()
 
     if type(palette) == str:
         cmap = colormap_from_palette(palette, n_colors=n_levels)
     else:
         cmap = palette
+
+    if max_threshold is None:
+        max_threshold = norm_heat.max()
 
     levels = np.linspace(low_threshold, max_threshold, n_levels)
 

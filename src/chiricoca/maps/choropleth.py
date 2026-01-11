@@ -168,7 +168,7 @@ def choropleth_map(
             **kwargs,
         )
 
-    if legend is not None:
+    if legend is not None and legend is not False:
         cbar_ax = add_ranged_color_legend(ax, bins, built_palette, **cbar_args)
     else:
         cbar_ax = None
@@ -195,6 +195,7 @@ def bivariate_choropleth_map(
     binning="uniform",
     xlabel=None,
     ylabel=None,
+    legend=True,
     cbar_ax=None,
     cbar_args={},
     palette_args={},
@@ -259,37 +260,38 @@ def bivariate_choropleth_map(
             )
 
     # legend
-    if cbar_ax is None:
-        cbar_ax = inset_axes(
-            ax,
-            width=cbar_args.get("width", "12%"),
-            height=cbar_args.get("height", "12%"),
-            loc=cbar_args.get("location", "lower center"),
-            bbox_to_anchor=cbar_args.get("bbox_to_anchor", [0.0, 0.0, 1.0, 1.0]),
-            bbox_transform=cbar_args.get("bbox_transform", ax.transAxes),
+    if legend:
+        if cbar_ax is None:
+            cbar_ax = inset_axes(
+                ax,
+                width=cbar_args.get("width", "12%"),
+                height=cbar_args.get("height", "12%"),
+                loc=cbar_args.get("location", "lower center"),
+                bbox_to_anchor=cbar_args.get("bbox_to_anchor", [0.0, 0.0, 1.0, 1.0]),
+                bbox_transform=cbar_args.get("bbox_transform", ax.transAxes),
+            )
+
+        # cbar_ax.xaxis.set_major_formatter(StrMethodFormatter("{x:,.2f}"))
+        # cbar_ax.yaxis.set_major_formatter(StrMethodFormatter("{x:,.2f}"))
+
+        cbar_ax.set_xlabel(
+            xlabel if xlabel else col1, fontsize=cbar_args.get("label_size", "x-small")
+        )
+        cbar_ax.set_ylabel(
+            ylabel if ylabel else col2, fontsize=cbar_args.get("label_size", "x-small")
         )
 
-    # cbar_ax.xaxis.set_major_formatter(StrMethodFormatter("{x:,.2f}"))
-    # cbar_ax.yaxis.set_major_formatter(StrMethodFormatter("{x:,.2f}"))
+        cbar_ax.set_xticks(
+            np.arange(k + 1) - 0.5,
+            labels=list(map(lambda x: f"{x:.2f}", col1_bins)),
+            fontsize=cbar_args.get("font_size", "x-small"),
+        )
+        cbar_ax.set_yticks(
+            np.arange(k + 1) - 0.5,
+            labels=list(map(lambda x: f"{x:.2f}", col2_bins)),
+            fontsize=cbar_args.get("font_size", "x-small"),
+        )
 
-    cbar_ax.set_xlabel(
-        xlabel if xlabel else col1, fontsize=cbar_args.get("label_size", "x-small")
-    )
-    cbar_ax.set_ylabel(
-        ylabel if ylabel else col2, fontsize=cbar_args.get("label_size", "x-small")
-    )
-
-    cbar_ax.set_xticks(
-        np.arange(k + 1) - 0.5,
-        labels=list(map(lambda x: f"{x:.2f}", col1_bins)),
-        fontsize=cbar_args.get("font_size", "x-small"),
-    )
-    cbar_ax.set_yticks(
-        np.arange(k + 1) - 0.5,
-        labels=list(map(lambda x: f"{x:.2f}", col2_bins)),
-        fontsize=cbar_args.get("font_size", "x-small"),
-    )
-
-    cbar_ax.imshow(bivariate_palette, origin="lower")
+        cbar_ax.imshow(bivariate_palette, origin="lower")
 
     return ax, bivariate_palette, cbar_ax
