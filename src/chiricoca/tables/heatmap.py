@@ -1,7 +1,7 @@
-import seaborn as sns
 import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
+import pandas as pd
+import seaborn as sns
 from scipy.cluster.hierarchy import dendrogram
 
 
@@ -16,7 +16,7 @@ def heatmap(
     min_samples=None,
     dendrograms=True,
     *args,
-    **kwargs
+    **kwargs,
 ):
     """
     Heatmap con clustering opcional usando HDBSCAN
@@ -89,22 +89,21 @@ def heatmap(
         row_clusterer = HDBSCAN(**hdbscan_kwargs)
         row_clusterer.fit(df.values)
 
+        row_dendro = dendrogram(
+            row_clusterer.single_linkage_tree_._linkage,
+            orientation="left",
+            ax=ax_row,
+            no_plot=False,
+        )
+
         row_order = reversed(row_dendro["leaves"])
         df_ordered = df_ordered.iloc[row_order, :]
 
         if dendrograms:
-            row_dendro = dendrogram(
-                row_clusterer.single_linkage_tree_._linkage,
-                orientation="left",
-                ax=ax_row,
-                no_plot=False,
-            )
             ax_row.set_xticks([])
             ax_row.set_yticks([])
             ax_row.set_axis_off()
             sns.despine(ax=ax_row)
-
-        
 
     if cluster_cols:
         col_clusterer = HDBSCAN(**hdbscan_kwargs)

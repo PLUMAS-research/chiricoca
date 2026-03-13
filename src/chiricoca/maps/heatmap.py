@@ -2,9 +2,9 @@ import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
-from chiricoca.geo.kde import kde_from_points
 from chiricoca.colors import color_legend, colormap_from_palette
 from chiricoca.geo.figures import figure_from_geodataframe
+from chiricoca.geo.kde import kde_from_points
 
 
 def heat_map(
@@ -31,7 +31,7 @@ def heat_map(
     legend_type="none",
     ax=None,
     fig_args=None,
-    **kwargs
+    **kwargs,
 ):
     if ax is None:
         if fig_args is None:
@@ -47,7 +47,7 @@ def heat_map(
         weight_column=weight,
     )
 
-    norm_heat = heat[2]# / heat[2].max()
+    norm_heat = heat[2]  # / heat[2].max()
 
     if type(palette) == str:
         cmap = colormap_from_palette(palette, n_colors=n_levels)
@@ -56,6 +56,8 @@ def heat_map(
 
     if max_threshold is None:
         max_threshold = norm_heat.max()
+
+    print(low_threshold, max_threshold)
 
     levels = np.linspace(low_threshold, max_threshold, n_levels)
 
