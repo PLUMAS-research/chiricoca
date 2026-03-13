@@ -1,10 +1,12 @@
-import matplotlib as mpl
-import seaborn as sns
 import os
+from importlib import resources
 from pathlib import Path
+
+import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib import font_manager
 import pandas as pd
+import seaborn as sns
+from matplotlib import font_manager
 
 
 def setup_style(
@@ -30,8 +32,6 @@ def setup_style(
         if font_family in mpl.font_manager.get_font_names():
             mpl.rcParams["font.family"] = font_family
     else:
-        
-
         mpl.rcParams["font.family"] = "sans-serif"
         mpl.rcParams["font.sans-serif"] = get_default_font_properties().get_name()
 
@@ -42,7 +42,7 @@ def setup_style(
 
 
 def get_default_font_path():
-    return Path(os.path.dirname(__file__)) / "assets" / "RobotoCondensed-Regular.ttf"
+    return resources.files("chiricoca.assets").joinpath("RobotoCondensed-Regular.ttf")
 
 
 def get_default_font_properties():
