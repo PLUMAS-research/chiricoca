@@ -109,13 +109,14 @@ def layout_labels_horizontal(ax, x_positions, labels, fontsize=8, padding_frac=0
     return best_levels
 
 
-def layout_labels_vertical(ax, y_positions, labels, fontsize=8, padding=0.005, iterations=50):
+def layout_labels_vertical(ax, y_positions, labels, fontsize=8, padding=0.005,
+                           iterations=50, y_min=None, y_max=None):
     """
     Calcula posiciones Y para etiquetas evitando solapamiento.
-    
+
     Desplaza etiquetas verticalmente cuando es necesario, minimizando
     el desplazamiento total respecto a las posiciones originales.
-    
+
     Parameters
     ----------
     ax : matplotlib.axes.Axes
@@ -130,7 +131,13 @@ def layout_labels_vertical(ax, y_positions, labels, fontsize=8, padding=0.005, i
         Espacio mínimo entre etiquetas en coordenadas de datos.
     iterations : int
         Número de órdenes aleatorios a probar.
-    
+    y_min : float, optional
+        Límite inferior del área de etiquetas. Si es None, usa el límite
+        inferior del eje.
+    y_max : float, optional
+        Límite superior del área de etiquetas. Si es None, usa el límite
+        superior del eje.
+
     Returns
     -------
     list of float
@@ -139,66 +146,79 @@ def layout_labels_vertical(ax, y_positions, labels, fontsize=8, padding=0.005, i
     fig = ax.get_figure()
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
-    
+
+    if y_min is None or y_max is None:
+        ax_ymin, ax_ymax = ax.get_ylim()
+        if y_min is None:
+            y_min = ax_ymin
+        if y_max is None:
+            y_max = ax_ymax
+
+    y_range = y_max - y_min
+    step = y_range * 0.005
+
     heights = []
     for y, label in zip(y_positions, labels):
         t = ax.text(0, y, label, va='center', fontsize=fontsize)
         bbox = t.get_window_extent(renderer=renderer).transformed(ax.transData.inverted())
         heights.append(bbox.y1 - bbox.y0)
         t.remove()
-    
+
     n = len(labels)
     y_list = list(y_positions)
-    
+
     def solve_greedy(order):
         y_finals = [None] * n
         occupied = []
-        
+
         for i in order:
             y_orig = y_list[i]
             h = heights[i]
-            
+
             best_y = y_orig
-            for offset in [0] + [d * s for d in range(1, 100) for s in [0.005, -0.005]]:
+            for offset in [0] + [d * s for d in range(1, 100) for s in [step, -step]]:
                 y_try = y_orig + offset
-                if y_try - h/2 < 0 or y_try + h/2 > 1:
+                if y_try - h/2 < y_min or y_try + h/2 > y_max:
                     continue
                 b, t = y_try - h/2 - padding, y_try + h/2 + padding
                 if not any(ob < t and ot > b for ob, ot in occupied):
                     best_y = y_try
                     break
-            
+
             y_finals[i] = best_y
             occupied.append((best_y - h/2 - padding, best_y + h/2 + padding))
-        
+
         return y_finals
-    
+
     def total_displacement(y_finals):
         return sum(abs(yf - yo) for yf, yo in zip(y_finals, y_list))
-    
+
+    def dist_to_boundary(i):
+        return min(y_list[i] - y_min, y_max - y_list[i])
+
     orders = [
         list(range(n)),
         list(range(n-1, -1, -1)),
         sorted(range(n), key=lambda i: heights[i], reverse=True),
         sorted(range(n), key=lambda i: y_list[i]),
         sorted(range(n), key=lambda i: y_list[i], reverse=True),
-        sorted(range(n), key=lambda i: min(y_list[i], 1 - y_list[i])),
+        sorted(range(n), key=lambda i: dist_to_boundary(i)),
     ]
-    
+
     rng = np.random.default_rng(42)
     for _ in range(iterations):
         orders.append(rng.permutation(n).tolist())
-    
+
     best_y_finals = None
     best_score = float('inf')
-    
+
     for order in orders:
         y_finals = solve_greedy(order)
         score = total_displacement(y_finals)
         if score < best_score:
             best_score = score
             best_y_finals = y_finals
-    
+
     return best_y_finals
 
 

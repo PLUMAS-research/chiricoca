@@ -136,8 +136,28 @@ def bivariate_matrix_from_palette(
 
 
 def categorical_color_legend(
-    ax, color_list, labels, loc="best", n_columns=None, **kwargs
+    ax, color_list, labels=None, loc="best", n_columns=None, **kwargs
 ):
+    """Leyenda categórica con parches de color.
+
+    Parameters
+    ----------
+    ax : matplotlib Axes
+    color_list : dict o iterable
+        Si es dict, las claves son etiquetas y los valores colores.
+        Si es iterable, se usa junto con ``labels``.
+    labels : iterable, opcional
+        Etiquetas correspondientes a cada color. Obligatorio si
+        ``color_list`` no es dict.
+    loc : str
+        Posición de la leyenda.
+    n_columns : int, opcional
+        Cantidad de columnas en la leyenda.
+    """
+    if isinstance(color_list, dict):
+        labels = list(color_list.keys())
+        color_list = list(color_list.values())
+
     legend_elements = []
 
     for label, color in zip(labels, color_list):
