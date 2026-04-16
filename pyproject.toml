@@ -1,6 +1,6 @@
 [project]
 name = "chiricoca"
-version = "0.1.4"
+version = "0.2"
 description = "Módulo con implementaciones de visualizaciones y herramientas utilitarias de análisis de datos"
 readme = "README.md"
 requires-python = ">=3.11"
