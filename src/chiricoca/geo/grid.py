@@ -99,9 +99,10 @@ def asignar_celdas_h3(
             print(f"  {n_fuera} registros descartados: fuera del área de estudio")
         result = result[~fuera].copy()
 
-    hex_cols = gdf_hex[["h3_cell_id", "geometry"]]
-    if "centroide" not in gdf_hex.columns:
-        hex_cols = hex_cols.copy()
+    if "centroide" in gdf_hex.columns:
+        hex_cols = gdf_hex[["h3_cell_id", "geometry", "centroide"]]
+    else:
+        hex_cols = gdf_hex[["h3_cell_id", "geometry"]].copy()
         hex_cols["centroide"] = hex_cols.geometry.centroid
 
     def _sjoin_columna(serie_geom, prefijo):
