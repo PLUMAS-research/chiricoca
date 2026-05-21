@@ -1,6 +1,6 @@
 # `chiricoca`
 
-Módulo de Python para visualización y análisis geoespacial, construido sobre `matplotlib`. Se usa en los cursos CC5208 (Visualización de Información) y CC5216 (Ciencia de Datos Geográficos) del DCC de la Universidad de Chile.
+Módulo de Python para visualización y análisis geoespacial, construido sobre `matplotlib`. Se usa en los cursos CC5208 (Visualización de Información) y CC5216 (Ciencia de Datos Geográficos) del DCC de la Universidad de Chile, y en los proyectos del grupo PLUMAS (PLataforma Urbana de Movilidad, Análisis y Simulación).
 
 ## Instalación
 
@@ -59,7 +59,12 @@ from chiricoca.colors import categorical_color_legend, add_ranged_color_legend
 ```
 
 ### `base`
-Ponderación (`normalize_rows`, `tfidf`, `weighted_mean`), algoritmos de posicionamiento de etiquetas y utilidades de ordenamiento.
+Ponderación (`normalize_rows`, `tfidf`, `weighted_mean`), algoritmos de posicionamiento de etiquetas, utilidades de ordenamiento y resolución de raíz de proyecto (`add_project_root`) para bootstrap de scripts en subcarpetas.
+
+```python
+from chiricoca.base.paths import add_project_root
+add_project_root()
+```
 
 ### `networks`
 Estadísticas de redes.
