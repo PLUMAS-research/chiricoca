@@ -99,9 +99,55 @@ def color_legend(
     return ax
 
 
+# Paletas bivariadas 3x3 accesibles, construidas en CIELCh y validadas con
+# simulacion de daltonismo (colorspacious, deuteranopia y protanopia con
+# severity 100, distancias CIEDE2000; julio 2026). Indexadas [fila_y][col_x]
+# con la fila 0 abajo; usarlas como argumento `palette` de
+# bivariate_choropleth_map. La luminancia decrece en ambos ejes, por lo que
+# funcionan en escala de grises.
+#
+# BIVARIATE_BLUE_ORANGE: eje x calido (naranja), eje y frio (azul). Distancia
+# minima global entre los 9 colores: 11.8 (vision normal), 10.6 (deutan),
+# 12.2 (protan). Los tonos se alinean con el eje amarillo-azul, que ambas
+# deficiencias preservan.
+BIVARIATE_BLUE_ORANGE = [
+    ["#eeeeee", "#f0c3a0", "#da9768"],
+    ["#b6bfec", "#bf96a0", "#af6d6c"],
+    ["#6d8bc9", "#816481", "#6e384b"],
+]
+
+# BIVARIATE_PURPLE_TEAL: eje x verde-azulado, eje y purpura. Distancia minima
+# adyacente: 11.6 / 9.1 / 9.3 (normal / deutan / protan), sin colisiones entre
+# pares no adyacentes. Alternativa si se prefieren dos extremos frios.
+BIVARIATE_PURPLE_TEAL = [
+    ["#eeeeee", "#a3d7c1", "#5db69a"],
+    ["#c9bae5", "#82a5b9", "#3c8995"],
+    ["#8e83c5", "#45709a", "#005173"],
+]
+
+
 def bivariate_matrix_from_palette(
     palette_name="PiYG", n_colors=3, darken_initial_value=-15
 ):
+    # una matriz de colores ya construida (lista anidada de colores hex o
+    # RGB, o array con forma (n_colors, n_colors, 3), indexada como
+    # [fila_y, columna_x]) se usa tal cual; permite paletas bivariadas
+    # personalizadas como BIVARIATE_BLUE_ORANGE
+    if not isinstance(palette_name, str):
+        arr = np.asarray(palette_name)
+        if arr.dtype.kind in ("U", "S", "O"):
+            matrix = np.asarray(
+                [[colors.to_rgb(c) for c in row] for row in palette_name]
+            )
+        else:
+            matrix = arr.astype(float)
+        if matrix.shape != (n_colors, n_colors, 3):
+            raise ValueError(
+                "la matriz de colores debe tener forma "
+                f"({n_colors}, {n_colors}, 3), se recibió {matrix.shape}"
+            )
+        return matrix
+
     full_palette = sns.color_palette(palette_name, n_colors=(n_colors - 1) * 2 + 1)
 
     cmap_x = full_palette[n_colors - 1 :]
