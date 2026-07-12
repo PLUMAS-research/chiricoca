@@ -3,6 +3,7 @@ from esda.moran import Moran, Moran_Local
 from libpysal.weights import Queen
 
 from chiricoca.colors import categorical_color_legend
+from chiricoca.maps.utils import context_boundaries
 
 
 # Paleta por defecto para clusters LISA (basada en BrBG)
@@ -100,10 +101,7 @@ def lisa_map(geodf, ax, title=None, context=None, colors=None, ns_label="Not sig
             subset.plot(ax=ax, color=color, edgecolor="white", linewidth=0.3, zorder=2)
 
     if context is not None:
-        xlim, ylim = ax.get_xlim(), ax.get_ylim()
-        context.boundary.plot(ax=ax, color="black", linewidth=0.5, alpha=0.3)
-        ax.set_xlim(xlim)
-        ax.set_ylim(ylim)
+        context_boundaries(ax, context)
 
     if title is not None:
         ax.set_title(title)

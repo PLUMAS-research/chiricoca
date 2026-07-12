@@ -104,6 +104,29 @@ def geographical_scale(ax, *args, **kwargs):
     ax.add_artist(ScaleBar(*args, **kwargs))
 
 
+def context_boundaries(
+    ax, geodf, color="black", linewidth=0.5, alpha=0.3, zorder=None
+):
+    """Dibuja los bordes de un GeoDataFrame como capa de contexto sobre un
+    mapa existente (por ejemplo, límites administrativos sobre una coropleta),
+    preservando el encuadre actual del eje.
+
+    Parameters
+    ----------
+    ax : matplotlib Axes
+        Eje con el mapa ya dibujado.
+    geodf : GeoDataFrame
+        Polígonos cuyos bordes se dibujarán (se usa `.boundary`).
+    """
+    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+    geodf.boundary.plot(
+        ax=ax, color=color, linewidth=linewidth, alpha=alpha, zorder=zorder
+    )
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    return ax
+
+
 def add_basemap(
     ax,
     file_path,
