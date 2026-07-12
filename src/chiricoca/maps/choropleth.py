@@ -193,6 +193,8 @@ def bivariate_choropleth_map(
     edgecolor="white",
     k=3,
     binning="uniform",
+    bins1=None,
+    bins2=None,
     xlabel=None,
     ylabel=None,
     legend=True,
@@ -211,10 +213,6 @@ def bivariate_choropleth_map(
             fig_args = {}
         fig, ax = figure_from_geodataframe(geodf, **fig_args)
 
-    bivariate_palette = bivariate_matrix_from_palette(
-        palette, n_colors=k, **palette_args
-    )
-
     if binning == "uniform":
         col1_binned, col1_bins = pd.cut(geodf[col1], bins=k, labels=False, retbins=True)
         col1_binned = col1_binned.rename(f"{col1}_bin_")
@@ -232,8 +230,41 @@ def bivariate_choropleth_map(
         col2_binned = pd.Series(col2_binning.yb, name=f"{col2}_bin_", index=geodf.index)
         col1_bins = np.insert(col1_binning.bins, 0, geodf[col1].min())
         col2_bins = np.insert(col2_binning.bins, 0, geodf[col2].min())
+    elif binning == "custom":
+        # umbrales explicitos por eje (espejo del binning custom de
+        # choropleth_map); ambos deben definir k clases
+        if bins1 is None or bins2 is None:
+            raise ValueError("bins1 y bins2 son necesarios para binning custom")
+        if len(bins1) != len(bins2):
+            raise ValueError("bins1 y bins2 deben definir la misma cantidad de clases")
+        k = len(bins1) - 1
+        col1_bins = np.asarray(bins1)
+        col2_bins = np.asarray(bins2)
+        col1_binned = pd.cut(
+            geodf[col1], bins=col1_bins, include_lowest=True, labels=False
+        ).rename(f"{col1}_bin_")
+        col2_binned = pd.cut(
+            geodf[col2], bins=col2_bins, include_lowest=True, labels=False
+        ).rename(f"{col2}_bin_")
+
+        for col, binned, bins in ((col1, col1_binned, col1_bins), (col2, col2_binned, col2_bins)):
+            if binned.isnull().any():
+                raise ValueError(
+                    f"los bins de {col} no cubren todos los valores",
+                    geodf[col].min(),
+                    geodf[col].max(),
+                )
+
+        col1_binned = col1_binned.astype(int)
+        col2_binned = col2_binned.astype(int)
     else:
         raise Exception(f"{binning} binning not supported")
+
+    # se construye despues del binning porque el binning custom deriva k de
+    # los umbrales entregados
+    bivariate_palette = bivariate_matrix_from_palette(
+        palette, n_colors=k, **palette_args
+    )
 
     binned_geodf = geodf.join(col1_binned, how="inner").join(col2_binned)[
         [f"{col1}_bin_", f"{col2}_bin_", "geometry"]
