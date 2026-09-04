@@ -45,10 +45,10 @@ from chiricoca.geo.figures import figure_from_geodataframe
 ```
 
 ### `tables`
-Gráficos estadísticos: Marimekko, streamgraph, barras apiladas, burbujas, scatter, heatmap y ternario.
+Gráficos estadísticos: Marimekko, streamgraph, barras apiladas, burbujas, scatter, heatmap, ternario y coordenadas paralelas.
 
 ```python
-from chiricoca.tables import marimekko, streamgraph, barchart, scatterplot
+from chiricoca.tables import marimekko, streamgraph, barchart, scatterplot, parallel_coordinates
 ```
 
 ### `colors`

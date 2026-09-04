@@ -6,3 +6,4 @@ from .marimekko import marimekko
 from .slopegraph import slopegraph
 from .heatmap import heatmap
 from .ternary import ternary_scatter
+from .parallel import parallel_coordinates
