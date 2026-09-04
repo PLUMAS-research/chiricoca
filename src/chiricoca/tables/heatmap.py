@@ -1,8 +1,34 @@
 import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
 import seaborn as sns
-from scipy.cluster.hierarchy import dendrogram
+from scipy.cluster.hierarchy import dendrogram, linkage
+
+
+def _dibujar_dendrograma(ax, valores, method, metric, orientation, color, linewidth):
+    """Agrupa las filas de ``valores`` y dibuja el árbol en ``ax`` si no es None.
+
+    Devuelve el orden de las hojas, que es el orden en que hay que poner las
+    filas para que calcen con el árbol: la hoja 0 queda arriba (orientación
+    ``left``) o a la izquierda (orientación ``top``), igual que la fila o
+    columna 0 del heatmap de seaborn.
+    """
+    enlaces = linkage(valores, method=method, metric=metric)
+    arbol = dendrogram(enlaces, no_plot=True)
+    if ax is not None:
+        n = len(arbol["leaves"])
+        alto = max(max(d) for d in arbol["dcoord"])
+        for hojas, alturas in zip(arbol["icoord"], arbol["dcoord"]):
+            if orientation == "left":
+                ax.plot(alturas, hojas, color=color, linewidth=linewidth, solid_capstyle="round")
+            else:
+                ax.plot(hojas, alturas, color=color, linewidth=linewidth, solid_capstyle="round")
+        if orientation == "left":
+            ax.set_xlim(alto * 1.05, 0)
+            ax.set_ylim(10 * n, 0)
+        else:
+            ax.set_xlim(0, 10 * n)
+            ax.set_ylim(0, alto * 1.05)
+        ax.set_axis_off()
+    return arbol["leaves"]
 
 
 def heatmap(
@@ -11,119 +37,95 @@ def heatmap(
     fig_args=None,
     cluster_rows=False,
     cluster_cols=False,
-    min_cluster_size=2,
+    method="average",
     metric="euclidean",
-    min_samples=None,
     dendrograms=True,
-    *args,
+    dendrogram_size=0.12,
+    dendrogram_color="#555555",
+    dendrogram_linewidth=0.8,
     **kwargs,
 ):
-    """
-    Heatmap con clustering opcional usando HDBSCAN
+    """Heatmap de una matriz, con clustering jerárquico opcional de filas y columnas.
+
+    Sin clustering es ``seaborn.heatmap`` sobre ``ax``. Con clustering la
+    función crea su propia figura, reordena las filas o las columnas según el
+    árbol y lo dibuja al costado; el largo de las ramas es la distancia entre
+    los grupos que une.
 
     Parameters
     ----------
     df : DataFrame
-        Datos para el heatmap
-    ax : matplotlib axis, optional
-        Axis donde dibujar. Si None, crea uno nuevo
+        Matriz a dibujar. Las filas y columnas se rotulan con el índice y las
+        columnas.
+    ax : matplotlib Axes, optional
+        Eje donde dibujar. Solo se admite sin clustering.
     fig_args : dict, optional
-        Argumentos para plt.subplots()
-    cluster_rows : bool, default False
-        Si aplicar clustering a las filas
-    cluster_cols : bool, default False
-        Si aplicar clustering a las columnas
-    min_cluster_size : int, default 2
-        Tamaño mínimo de cluster para HDBSCAN
-    metric : str, default 'euclidean'
-        Métrica de distancia para HDBSCAN
-    min_samples : int, optional
-        Parámetro min_samples para HDBSCAN
-    """
+        Argumentos para ``plt.figure`` (con clustering) o ``plt.subplots``.
+    cluster_rows, cluster_cols : bool
+        Si reordenar las filas o las columnas con clustering jerárquico.
+    method : str
+        Criterio de enlace de ``scipy.cluster.hierarchy.linkage``: ``average``,
+        ``complete``, ``single`` o ``ward``.
+    metric : str
+        Distancia entre filas (o columnas). Con ``ward`` tiene que ser
+        ``euclidean``.
+    dendrograms : bool
+        Si dibujar los árboles. Con ``False`` solo se reordena.
+    dendrogram_size : float
+        Ancho del árbol de filas (o alto del de columnas) como fracción del
+        heatmap.
+    dendrogram_color, dendrogram_linewidth
+        Estilo de las ramas.
+    **kwargs
+        Se pasan a ``seaborn.heatmap`` (``cmap``, ``robust``, ``annot``,
+        ``cbar_kws``, ``linewidths``, entre otros).
 
-    # Si no hay clustering, usar la función original
+    Returns
+    -------
+    El eje del heatmap. Con clustering, la figura se obtiene con
+    ``ax.get_figure()`` y los ejes de los árboles quedan en ``fig.axes``.
+    """
     if not cluster_rows and not cluster_cols:
         if ax is None:
-            if fig_args is None:
-                fig_args = {}
-            fig, ax = plt.subplots(**fig_args)
-
-        sns.heatmap(df, ax=ax, *args, **kwargs)
+            _, ax = plt.subplots(**(fig_args or {}))
+        sns.heatmap(df, ax=ax, **kwargs)
         return ax
 
-    # Clustering habilitado
-    from hdbscan import HDBSCAN
+    if ax is not None:
+        raise ValueError("Con clustering la función crea su propia figura: no se puede entregar ax")
 
-    # Configurar figura con subplots para dendrogramas
-    if fig_args is None:
-        fig_args = {"figsize": (6, 4)}
+    fig = plt.figure(**(fig_args or {}))
+    ancho = [dendrogram_size, 1] if (cluster_rows and dendrograms) else [1]
+    alto = [dendrogram_size, 1] if (cluster_cols and dendrograms) else [1]
+    grilla = fig.add_gridspec(
+        len(alto), len(ancho), width_ratios=ancho, height_ratios=alto, wspace=0.02, hspace=0.02
+    )
+    ax_main = fig.add_subplot(grilla[-1, -1])
 
-    fig = plt.figure(**fig_args)
-
-    # Determinar layout según qué clustering está habilitado
-    if cluster_rows and cluster_cols:
-        # Ambos clustering
-        ax_row = plt.subplot2grid((3, 3), (1, 0), rowspan=1)
-        ax_col = plt.subplot2grid((3, 3), (0, 1), colspan=1)
-        ax_main = plt.subplot2grid((3, 3), (1, 1), rowspan=1, colspan=1)
-    elif cluster_rows:
-        # Solo filas
-        ax_row = plt.subplot2grid((1, 3), (0, 0))
-        ax_main = plt.subplot2grid((1, 3), (0, 1), colspan=2)
-        ax_col = None
-    elif cluster_cols:
-        # Solo columnas
-        ax_col = plt.subplot2grid((3, 1), (0, 0))
-        ax_main = plt.subplot2grid((3, 1), (1, 0), rowspan=2)
-        ax_row = None
-
-    # Parámetros para HDBSCAN
-    hdbscan_kwargs = {"min_cluster_size": min_cluster_size, "metric": metric}
-    if min_samples is not None:
-        hdbscan_kwargs["min_samples"] = min_samples
-
-    # Aplicar clustering y obtener orden
-    df_ordered = df.copy()
-
+    ordenada = df
     if cluster_rows:
-        row_clusterer = HDBSCAN(**hdbscan_kwargs)
-        row_clusterer.fit(df.values)
-
-        row_dendro = dendrogram(
-            row_clusterer.single_linkage_tree_._linkage,
-            orientation="left",
-            ax=ax_row,
-            no_plot=False,
+        ax_filas = fig.add_subplot(grilla[-1, 0]) if dendrograms else None
+        orden = _dibujar_dendrograma(
+            ax_filas, df.values, method, metric, "left", dendrogram_color, dendrogram_linewidth
         )
-
-        row_order = reversed(row_dendro["leaves"])
-        df_ordered = df_ordered.iloc[row_order, :]
-
-        if dendrograms:
-            ax_row.set_xticks([])
-            ax_row.set_yticks([])
-            ax_row.set_axis_off()
-            sns.despine(ax=ax_row)
-
+        ordenada = ordenada.iloc[orden, :]
     if cluster_cols:
-        col_clusterer = HDBSCAN(**hdbscan_kwargs)
-        col_clusterer.fit(df.T.values)
-
-        col_dendro = dendrogram(
-            col_clusterer.single_linkage_tree_._linkage,
-            orientation="top",
-            ax=ax_col,
-            no_plot=False,
+        ax_columnas = fig.add_subplot(grilla[0, -1]) if dendrograms else None
+        orden = _dibujar_dendrograma(
+            ax_columnas, df.T.values, method, metric, "top", dendrogram_color, dendrogram_linewidth
         )
-        ax_col.set_xticks([])
-        ax_col.set_yticks([])
-        ax_col.set_axis_off()
-        sns.despine(ax=ax_col)
+        ordenada = ordenada.iloc[:, orden]
 
-        col_order = col_dendro["leaves"]
-        df_ordered = df_ordered.iloc[:, col_order]
+    sns.heatmap(ordenada, ax=ax_main, **kwargs)
 
-    # Crear heatmap principal
-    sns.heatmap(df_ordered, ax=ax_main, *args, **kwargs)
+    if cluster_rows and dendrograms:
+        # las etiquetas de fila van al lado contrario del árbol, si no lo tapan.
+        # seaborn las deja verticales en el lado derecho, que no revisa.
+        ax_main.yaxis.tick_right()
+        ax_main.yaxis.set_label_position("right")
+        for etiqueta in ax_main.get_yticklabels():
+            etiqueta.set_rotation(0)
+    if cluster_cols and dendrograms:
+        ax_main.xaxis.tick_bottom()
 
     return ax_main
