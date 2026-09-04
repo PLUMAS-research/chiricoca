@@ -1,3 +1,5 @@
+import warnings
+
 import h3
 import geopandas as gpd
 from shapely.geometry import Point, Polygon
@@ -129,3 +131,48 @@ def asignar_celdas_h3(
         print(f"  {n_descartados} registros descartados: sin celda H3 asignada")
 
     return result
+
+
+def count_in_grid(points, grid_level=8, column="n", grid=None, agg=None):
+    """Cuenta o agrega los points que caen en cada celda de una grilla H3.
+
+    Resuelve en un llamado la secuencia de crear la grilla, cruzarla con los
+    points y volver a unir el resultado, que de otro modo son cuatro pasos y
+    obliga a conocer el nombre interno del índice de celdas.
+
+    Parameters
+    ----------
+    points : GeoDataFrame
+        Geometrías de punto. Se usa su bounding box si no se entrega `grid`.
+    grid_level : int
+        Resolución H3 de la grilla que se construye cuando no se entrega una.
+    column : str
+        Nombre de la columna de conteo.
+    agg : dict, opcional
+        Agregaciones por columna, como las de `DataFrame.agg`. Si se entrega,
+        el resultado trae esas columnas además del conteo.
+
+    Returns
+    -------
+    GeoDataFrame con una fila por celda con al menos un punto.
+    """
+    if grid is None:
+        grid = h3_grid_from_bounds(points.total_bounds, grid_level=grid_level)
+
+    indice = grid.index.name
+    cruce = gpd.sjoin(points, grid.reset_index(), predicate="within")
+
+    if len(cruce) < len(points):
+        perdidos = len(points) - len(cruce)
+        warnings.warn(
+            f"{perdidos} de {len(points)} points quedaron fuera de la grilla "
+            "y no se contaron. Suele ser el borde: subir extra_margin al crear "
+            "la grilla, o entregarla ya construida.",
+            stacklevel=2,
+        )
+
+    resultado = cruce.groupby(indice).size().rename(column).to_frame()
+    if agg:
+        resultado = resultado.join(cruce.groupby(indice).agg(agg))
+
+    return grid.join(resultado, how="inner")
