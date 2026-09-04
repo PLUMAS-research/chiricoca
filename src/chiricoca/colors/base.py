@@ -1,5 +1,6 @@
 import matplotlib.colors as colors
 import numpy as np
+import pandas as pd
 import seaborn as sns
 import spectra
 from matplotlib import colorbar
@@ -103,13 +104,16 @@ def color_legend(
 # simulacion de daltonismo (colorspacious, deuteranopia y protanopia con
 # severity 100, distancias CIEDE2000; julio 2026). Indexadas [fila_y][col_x]
 # con la fila 0 abajo; usarlas como argumento `palette` de
-# bivariate_choropleth_map. La luminancia decrece en ambos ejes, por lo que
-# funcionan en escala de grises.
+# bivariate_choropleth_map. La luminancia decrece en ambos ejes, asi que cada
+# eje conserva su orden aunque se pierda el tono. Eso no las hace legibles en
+# escala de grises: ahi las nueve clases dejan de separarse, porque la
+# antidiagonal cruza luminancias casi iguales (L* 68, 66 y 58 en
+# BIVARIATE_BLUE_ORANGE). Es inherente a una paleta bivariada.
 #
 # BIVARIATE_BLUE_ORANGE: eje x calido (naranja), eje y frio (azul). Distancia
-# minima global entre los 9 colores: 11.8 (vision normal), 10.6 (deutan),
-# 12.2 (protan). Los tonos se alinean con el eje amarillo-azul, que ambas
-# deficiencias preservan.
+# minima global entre los 9 colores: 11.7 (vision normal), 10.6 (deutan),
+# 12.2 (protan), 9.2 (tritan). Los tonos se alinean con el eje amarillo-azul,
+# que ambas deficiencias preservan.
 BIVARIATE_BLUE_ORANGE = [
     ["#eeeeee", "#f0c3a0", "#da9768"],
     ["#b6bfec", "#bf96a0", "#af6d6c"],
@@ -215,11 +219,54 @@ def categorical_color_legend(
     else:
         n_columns = 1
 
+    previa = ax.legend_
     artist = ax.legend(
         handles=legend_elements, loc=loc, frameon=False, ncol=n_columns, **kwargs
     )
-    ax.add_artist(artist)
+    if previa is not None and previa not in ax.get_children():
+        # ax.legend reemplaza la leyenda anterior, así que se conserva como
+        # artista. La nueva queda como leyenda del eje, que es la única que
+        # savefig(bbox_inches="tight") considera al recortar la figura: una
+        # leyenda agregada con add_artist fuera del eje queda cortada.
+        ax.add_artist(previa)
     return artist
+
+
+def categorical_colors(values, palette=None):
+    """Asigna un color a cada categoría de ``values``.
+
+    Parameters
+    ----------
+    values : Series o iterable
+        Valores categóricos. Si es una Series categórica se respeta el orden
+        de sus categorías; si no, las categorías se ordenan.
+    palette : str, list o dict, optional
+        Nombre de una paleta de seaborn, lista de colores, o diccionario
+        categoría -> color, que es la forma de mantener el mismo color para
+        una categoría en varias figuras. Si es None se usa ``tab10`` hasta
+        diez categorías y ``husl`` con más.
+
+    Returns
+    -------
+    (mapa, colores): el diccionario categoría -> color y la lista con el
+    color de cada elemento de ``values``, en su orden.
+    """
+    serie = pd.Series(values)
+    if not isinstance(serie.dtype, pd.CategoricalDtype):
+        serie = serie.astype("category")
+    niveles = list(serie.cat.categories)
+
+    if isinstance(palette, dict):
+        faltan = [nivel for nivel in niveles if nivel not in palette]
+        if faltan:
+            raise ValueError(f"La paleta no tiene color para {faltan}")
+        mapa = {nivel: palette[nivel] for nivel in niveles}
+    else:
+        if palette is None:
+            palette = "tab10" if len(niveles) <= 10 else "husl"
+        mapa = dict(zip(niveles, sns.color_palette(palette, n_colors=len(niveles))))
+
+    return mapa, [mapa[valor] for valor in serie]
 
 
 def add_ranged_color_legend(
