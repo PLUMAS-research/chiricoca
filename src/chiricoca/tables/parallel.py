@@ -1,3 +1,5 @@
+import warnings
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -84,7 +86,7 @@ def parallel_coordinates(
 
     datos = df.dropna(subset=columns)
     if len(datos) < len(df):
-        print(f"  {len(df) - len(datos)} filas con valores faltantes no se dibujan")
+        warnings.warn(f"{len(df) - len(datos)} filas con valores faltantes no se dibujan", stacklevel=2)
 
     valores = datos[columns].astype(float)
     minimos, maximos = valores.min(), valores.max()

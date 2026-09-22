@@ -11,11 +11,11 @@ def scatterplot(
     hue=None,
     annotate=False,
     avoid_collisions=False,
-    scatter_args={},
-    label_args={},
+    scatter_args=None,
+    label_args=None,
     na_value=0,
     drop_na=False,
-    label_collision_args={"lim": 5},
+    label_collision_args=None,
     label_filter_func=None,
     legend_args=None,
     ax=None,
@@ -65,6 +65,9 @@ def scatterplot(
     None
     """
 
+    scatter_args = dict(scatter_args or {})
+    label_args = dict(label_args or {})
+    label_collision_args = {"lim": 5, **(label_collision_args or {})}
     if ax is None:
         if fig_args is None:
             fig_args = {}

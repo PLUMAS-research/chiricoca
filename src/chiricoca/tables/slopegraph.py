@@ -36,8 +36,8 @@ def slopegraph(
         de cada línea.
     ax : matplotlib.axes.Axes, optional
         Axes donde dibujar. Si es None se crea una figura nueva.
-    colors : tuple of 2 colors, dict, or single color
-        - tuple ``(c_right_higher, c_left_higher)``: colorea según dirección.
+    colors : sequence of 2 colors, dict, or single color
+        - dos colores ``(c_right_higher, c_left_higher)``: colorea según dirección.
         - dict ``{label: color}``: color explícito por etiqueta.
         - str: color único para todas las líneas.
     value_format : str
@@ -97,7 +97,7 @@ def slopegraph(
         lv, rv = row.iloc[0], row.iloc[1]
         if isinstance(colors, dict):
             row_colors.append(colors.get(label, "#636363"))
-        elif isinstance(colors, tuple):
+        elif isinstance(colors, (tuple, list)) and len(colors) == 2:
             row_colors.append(colors[0] if rv > lv else colors[1])
         else:
             row_colors.append(colors)

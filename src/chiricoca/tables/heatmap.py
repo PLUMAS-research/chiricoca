@@ -116,7 +116,28 @@ def heatmap(
         )
         ordenada = ordenada.iloc[:, orden]
 
+    if cluster_rows and dendrograms and kwargs.get("cbar", True) and "cbar_ax" not in kwargs:
+        # los rótulos de fila van a la derecha, así que la barra de color se
+        # corre más allá del rótulo más largo, en un eje propio
+        from matplotlib.font_manager import FontProperties
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+        puntos = FontProperties(size=plt.rcParams["ytick.labelsize"]).get_size_in_points()
+        separacion = 0.15 + max(len(str(i)) for i in ordenada.index) * 0.6 * puntos / 72
+        kwargs["cbar_ax"] = make_axes_locatable(ax_main).append_axes("right", size="4%", pad=separacion)
+
     sns.heatmap(ordenada, ax=ax_main, **kwargs)
+
+    # la barra de color le quita ancho al heatmap; los árboles se ajustan a la
+    # posición final del heatmap para que sus hojas sigan sobre las celdas
+    fig.canvas.draw()
+    principal = ax_main.get_position()
+    if cluster_cols and dendrograms:
+        arriba = ax_columnas.get_position()
+        ax_columnas.set_position([principal.x0, arriba.y0, principal.width, arriba.height])
+    if cluster_rows and dendrograms:
+        lado = ax_filas.get_position()
+        ax_filas.set_position([lado.x0, principal.y0, lado.width, principal.height])
 
     if cluster_rows and dendrograms:
         # las etiquetas de fila van al lado contrario del árbol, si no lo tapan.

@@ -36,10 +36,11 @@ def _get_sort_key(df, sort_by, axis='rows'):
         data = df.T
         sum_axis = 1
     
-    if sort_by == 'sum' or sort_by == True:
+    if sort_by is True or sort_by == 'sum':
         return data.sum(axis=sum_axis)
     elif sort_by == 'name':
-        return pd.Series(range(len(data.index)), index=data.index)
+        # la clave es la etiqueta misma, así el orden es alfabético (o numérico)
+        return pd.Series(list(data.index), index=data.index)
     elif sort_by == 'entropy':
         props = data.div(data.sum(axis=sum_axis), axis=0)
         return -(props * np.log(props + 1e-10)).sum(axis=sum_axis)

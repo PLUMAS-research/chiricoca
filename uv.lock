@@ -213,7 +213,7 @@ wheels = [
 
 [[package]]
 name = "chiricoca"
-version = "0.3.0"
+version = "0.4.0"
 source = { virtual = "." }
 dependencies = [
     { name = "adjusttext" },
@@ -235,7 +235,6 @@ dependencies = [
     { name = "scipy" },
     { name = "seaborn" },
     { name = "shapely" },
-    { name = "spectra" },
     { name = "wordcloud" },
 ]
 
@@ -260,7 +259,6 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.17.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "shapely", specifier = ">=2.1.2" },
-    { name = "spectra", specifier = ">=0.1.0" },
     { name = "wordcloud", specifier = ">=1.9.6" },
 ]
 
@@ -307,19 +305,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
-]
-
-[[package]]
-name = "colormath2"
-version = "3.0.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "networkx" },
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a0/d2/ffc1354bdb2e5aa2772782bd34351caf2e98ef2a0850080feda4216178d9/colormath2-3.0.3.tar.gz", hash = "sha256:e797613f4f0b86c6c218a1c7dc50f1259e6934e391581969b689ae27379c2ffa", size = 51301, upload-time = "2024-11-02T16:16:38.137Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/48/10/175f2b97c2e29fc66b6190db6effabe4ae2c4b2030b214db7e3e37439e11/colormath2-3.0.3-py3-none-any.whl", hash = "sha256:2098e9cdb4923225cfae8966b1d51abfe4517059ead2ff4e55103d6375fa7e51", size = 40663, upload-time = "2024-11-02T16:16:35.971Z" },
 ]
 
 [[package]]
@@ -1892,18 +1877,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7b/ae/2d9c981590ed9999a0d91755b47fc74f74de286b0f5cee14c9269041e6c4/soupsieve-2.8.3.tar.gz", hash = "sha256:3267f1eeea4251fb42728b6dfb746edc9acaffc4a45b27e19450b676586e8349", size = 118627, upload-time = "2026-01-20T04:27:02.457Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/46/2c/1462b1d0a634697ae9e55b3cecdcb64788e8b7d63f54d923fcd0bb140aed/soupsieve-2.8.3-py3-none-any.whl", hash = "sha256:ed64f2ba4eebeab06cc4962affce381647455978ffc1e36bb79a545b91f45a95", size = 37016, upload-time = "2026-01-20T04:27:01.012Z" },
-]
-
-[[package]]
-name = "spectra"
-version = "0.1.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "colormath2" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/68/1b/23c9c5c8f60fa8d5a4585448e958b6b68f4d69255f50d2d9c2f13b8bc8c1/spectra-0.1.0.tar.gz", hash = "sha256:6a30e33241cb18256020395181cb4cc029dcac6de6f8d78cecbed81c14226a3f", size = 19363, upload-time = "2025-02-13T04:01:20.934Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/35/99/61929098d0ad75d9b7240ab028083e199803f78e554b2581f02f0c97c35f/spectra-0.1.0-py3-none-any.whl", hash = "sha256:2aa0f4a6e3cb58c667df5c3321be0630320a03f29b04114fc223119e51213ebb", size = 17488, upload-time = "2025-02-13T04:01:19.352Z" },
 ]
 
 [[package]]

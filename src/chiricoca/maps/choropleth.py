@@ -1,17 +1,17 @@
-import matplotlib.colors as colors
 import numpy as np
 import pandas as pd
-import seaborn as sns
 from mapclassify import FisherJenks, Quantiles
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-from matplotlib.ticker import StrMethodFormatter
 
 from chiricoca.colors import (
-    MidpointNormalize,
+    BIVARIATE_BLUE_ORANGE,
     add_ranged_color_legend,
     bivariate_matrix_from_palette,
+    build_palette,
+    fit_tick_labels,
+    format_edge,
 )
-
+from chiricoca.colors.base import _inches
 from chiricoca.geo.figures import figure_from_geodataframe
 
 
@@ -32,13 +32,23 @@ def choropleth_map(
     alpha=1.0,
     linewidth=1,
     zorder=1,
-    cbar_args={},
+    cbar_args=None,
     sqrt_transform=False,
     return_map_data=True,
+    missing_color="#e0e0e0",
+    missing_hatch=None,
     ax=None,
     fig_args=None,
     **kwargs,
 ):
+    """Coropleta clasificada.
+
+    Los polígonos sin valor en `column` se dibujan con `missing_color` (y
+    `missing_hatch`, un patrón de matplotlib como `"///"`), o se omiten si es
+    None. `palette_center` fija el valor en que se centra una paleta
+    divergente; sin él, la paleta es divergente solo si los datos cruzan cero.
+    """
+    cbar_args = cbar_args or {}
     if ax is None:
         if fig_args is None:
             fig_args = {}
@@ -48,6 +58,7 @@ def choropleth_map(
     if "color" in kwargs:
         del kwargs["color"]
 
+    sin_dato = geodf[pd.isnull(geodf[column])]
     geodf = geodf[pd.notnull(geodf[column])].copy()
     min_value, max_value = geodf[column].min(), geodf[column].max()
 
@@ -68,9 +79,9 @@ def choropleth_map(
             bins = np.insert(binning_method.bins, 0, geodf[column].min())
         geodf = geodf.assign(__bin__=binning_method.yb)
     elif binning == "uniform":
-        bins = np.linspace(
-            min_value, max_value + (max_value - min_value) * 0.001, num=k + 1
-        )
+        # el último borde es el máximo: las clases son (a, b] con el mínimo
+        # incluido en la primera, así la leyenda muestra los valores reales
+        bins = np.linspace(min_value, max_value, num=k + 1)
         geodf = geodf.assign(
             __bin__=lambda x: pd.cut(
                 x[column], bins=bins, include_lowest=True, labels=False
@@ -100,61 +111,15 @@ def choropleth_map(
             "only fisher_jenks, quantiles and uniform binning are supported"
         )
 
-    cmap_name = None
-    norm = None
-    midpoint = 0.0
-    using_divergent = False
-    built_palette = None
+    built_palette = build_palette(
+        bins, palette, palette_center, default_divergent, default_negative, default_positive, palette_type
+    )
 
-    if palette_center is not None:
-        midpoint = palette_center
-
-    if palette is None:
-        if min_value < 0 and max_value > 0:
-            # divergent
-            cmap_name = default_divergent
-            norm = MidpointNormalize(vmin=min_value, vmax=max_value, midpoint=midpoint)
-            using_divergent = True
-        elif min_value < 0:
-            # sequential
-            cmap_name = default_negative
-        else:
-            # sequential
-            cmap_name = default_positive
-    else:
-        if not isinstance(palette, colors.Colormap):
-            if colors.is_color_like(palette):
-                if palette_type == "light":
-                    built_palette = sns.light_palette(palette, n_colors=k)
-                else:
-                    built_palette = sns.dark_palette(palette, n_colors=k)
-            else:
-                built_palette = sns.color_palette(palette, n_colors=k)
-
-    if norm is None:
-        if palette_center is None:
-            # norm = colors.Normalize(vmin=min_value, vmax=max_value)
-            norm = colors.BoundaryNorm(bins, k)
-        else:
-            norm = MidpointNormalize(vmin=min_value, vmax=max_value, midpoint=midpoint)
-            using_divergent = True
-
-    if built_palette is None:
-        if not using_divergent:
-            built_palette = sns.color_palette(cmap_name, n_colors=k)
-        else:
-            middle_idx = np.where((bins[:-1] * bins[1:]) <= 0)[0][0]
-            left = middle_idx
-            right = k - middle_idx - 1
-            if left == right:
-                built_palette = sns.color_palette(cmap_name, n_colors=k)
-            else:
-                delta = np.abs(left - right)
-                expanded_k = k + delta
-                start_idx = max(middle_idx - left, right - middle_idx)
-                built_palette = sns.color_palette(cmap_name, n_colors=expanded_k)[
-                    start_idx : start_idx + k
-                ]
+    if missing_color is not None and len(sin_dato) > 0:
+        sin_dato.plot(
+            ax=ax, facecolor=missing_color, hatch=missing_hatch, edgecolor=edgecolor,
+            linewidth=linewidth, alpha=alpha, zorder=zorder, aspect=None,
+        )
 
     for idx, group in geodf.groupby("__bin__"):
         group.plot(
@@ -169,7 +134,11 @@ def choropleth_map(
         )
 
     if legend is not None and legend is not False:
-        cbar_ax = add_ranged_color_legend(ax, bins, built_palette, **cbar_args)
+        # cada clase ocupa lo mismo en la leyenda y los bordes van compactos;
+        # cbar_args puede cambiar cualquiera de los dos
+        opciones = {"bin_spacing": "uniform", "tick_labels": [format_edge(b) for b in bins]}
+        opciones.update(cbar_args)
+        cbar_ax = add_ranged_color_legend(ax, bins, built_palette, **opciones)
     else:
         cbar_ax = None
 
@@ -189,7 +158,7 @@ def bivariate_choropleth_map(
     geodf,
     col1,
     col2,
-    palette="PiYG",
+    palette=None,
     edgecolor="white",
     k=3,
     binning="uniform",
@@ -199,8 +168,8 @@ def bivariate_choropleth_map(
     ylabel=None,
     legend=True,
     cbar_ax=None,
-    cbar_args={},
-    palette_args={},
+    cbar_args=None,
+    palette_args=None,
     linewidth=1,
     alpha=1,
     zorder=1,
@@ -208,6 +177,8 @@ def bivariate_choropleth_map(
     fig_args=None,
     **kwargs,
 ):
+    cbar_args = cbar_args or {}
+    palette_args = palette_args or {}
     if ax is None:
         if fig_args is None:
             fig_args = {}
@@ -258,10 +229,13 @@ def bivariate_choropleth_map(
         col1_binned = col1_binned.astype(int)
         col2_binned = col2_binned.astype(int)
     else:
-        raise Exception(f"{binning} binning not supported")
+        raise ValueError(f"{binning} binning not supported")
 
     # se construye despues del binning porque el binning custom deriva k de
-    # los umbrales entregados
+    # los umbrales entregados. Sin paleta, con tres clases va la matriz
+    # accesible del módulo; con otro k se genera desde PiYG
+    if palette is None:
+        palette = BIVARIATE_BLUE_ORANGE if k == 3 else "PiYG"
     bivariate_palette = bivariate_matrix_from_palette(
         palette, n_colors=k, **palette_args
     )
@@ -281,7 +255,7 @@ def bivariate_choropleth_map(
 
             color_geodf.plot(
                 ax=ax,
-                color=np.clip(bivariate_palette[(j, i)], 0.0, 1.0),
+                color=bivariate_palette[(j, i)],
                 linewidth=linewidth,
                 edgecolor=edgecolor,
                 alpha=alpha,
@@ -302,9 +276,6 @@ def bivariate_choropleth_map(
                 bbox_transform=cbar_args.get("bbox_transform", ax.transAxes),
             )
 
-        # cbar_ax.xaxis.set_major_formatter(StrMethodFormatter("{x:,.2f}"))
-        # cbar_ax.yaxis.set_major_formatter(StrMethodFormatter("{x:,.2f}"))
-
         cbar_ax.set_xlabel(
             xlabel if xlabel else col1, fontsize=cbar_args.get("label_size", "x-small")
         )
@@ -312,14 +283,16 @@ def bivariate_choropleth_map(
             ylabel if ylabel else col2, fontsize=cbar_args.get("label_size", "x-small")
         )
 
+        etiquetas_x = [format_edge(x) for x in col1_bins]
         cbar_ax.set_xticks(
             np.arange(k + 1) - 0.5,
-            labels=list(map(lambda x: f"{x:.2f}", col1_bins)),
+            labels=etiquetas_x,
             fontsize=cbar_args.get("font_size", "x-small"),
         )
+        fit_tick_labels(cbar_ax, etiquetas_x, _inches(cbar_args.get("width", "12%"), ax), cbar_args.get("font_size", "x-small"))
         cbar_ax.set_yticks(
             np.arange(k + 1) - 0.5,
-            labels=list(map(lambda x: f"{x:.2f}", col2_bins)),
+            labels=[format_edge(x) for x in col2_bins],
             fontsize=cbar_args.get("font_size", "x-small"),
         )
 

@@ -3,6 +3,7 @@ from esda.moran import Moran, Moran_Local
 from libpysal.weights import Queen
 
 from chiricoca.colors import categorical_color_legend
+from chiricoca.geo.figures import figure_from_geodataframe
 from chiricoca.maps.utils import context_boundaries
 
 
@@ -16,7 +17,7 @@ LISA_COLORS = {
 }
 
 
-def compute_lisa(geodf, column, w=None, alpha=0.05, ns_label="Not significant"):
+def compute_lisa(geodf, column, w=None, alpha=0.05, ns_label="Not significant", permutations=999, seed=None):
     """Compute global Moran's I and local indicators (LISA).
 
     Builds Queen weights (unless ``w`` is provided), computes Moran's I and
@@ -36,6 +37,11 @@ def compute_lisa(geodf, column, w=None, alpha=0.05, ns_label="Not significant"):
         Significance threshold for LISA clusters.
     ns_label : str
         Label for non-significant observations.
+    permutations : int
+        Permutations for the pseudo p-values.
+    seed : int, optional
+        Seed of the permutations. Set it so the significant clusters are the
+        same each time the figure is regenerated.
 
     Returns
     -------
@@ -48,11 +54,11 @@ def compute_lisa(geodf, column, w=None, alpha=0.05, ns_label="Not significant"):
         ``p_norm``, ``z_norm``.
     """
     if w is None:
-        w = Queen.from_dataframe(geodf)
+        w = Queen.from_dataframe(geodf, use_index=True)
         w.transform = "r"
 
-    moran_global = Moran(geodf[column], w)
-    lisa = Moran_Local(geodf[column], w)
+    moran_global = Moran(geodf[column], w, permutations=permutations)
+    lisa = Moran_Local(geodf[column], w, permutations=permutations, seed=seed)
 
     result = geodf.copy()
     label_map = {1: "HH", 2: "LH", 3: "LL", 4: "HL"}
@@ -64,15 +70,28 @@ def compute_lisa(geodf, column, w=None, alpha=0.05, ns_label="Not significant"):
     return result, moran_global
 
 
-def lisa_map(geodf, ax, title=None, context=None, colors=None, ns_label="Not significant"):
+def lisa_map(
+    geodf,
+    ax=None,
+    title=None,
+    context=None,
+    colors=None,
+    ns_label="Not significant",
+    legend=True,
+    legend_args=None,
+    fig_args=None,
+):
     """Draw a LISA cluster map with optional context boundaries.
 
     Parameters
     ----------
     geodf : GeoDataFrame
         GeoDataFrame with a ``lisa_cluster`` column (output of ``compute_lisa``).
-    ax : matplotlib Axes
-        Axes on which to draw.
+    ax : matplotlib Axes, optional
+        Axes on which to draw. Created with ``figure_from_geodataframe`` if None.
+    legend : bool
+        Categorical legend with the clusters present in the map. ``legend_args``
+        goes to ``categorical_color_legend``.
     title : str, optional
         Panel title.
     context : GeoDataFrame, optional
@@ -84,6 +103,8 @@ def lisa_map(geodf, ax, title=None, context=None, colors=None, ns_label="Not sig
     """
     if colors is None:
         colors = LISA_COLORS
+    if ax is None:
+        fig, ax = figure_from_geodataframe(geodf, **(fig_args or {}))
 
     ns = geodf[geodf["lisa_cluster"] == ns_label]
     sig = geodf[geodf["lisa_cluster"] != ns_label]
@@ -103,5 +124,10 @@ def lisa_map(geodf, ax, title=None, context=None, colors=None, ns_label="Not sig
     if context is not None:
         context_boundaries(ax, context)
 
+    if legend:
+        presentes = {c: colors[c] for c in colors if (geodf["lisa_cluster"] == c).any()}
+        categorical_color_legend(ax, presentes, **{"loc": "lower left", **(legend_args or {})})
+
     if title is not None:
         ax.set_title(title)
+    return ax

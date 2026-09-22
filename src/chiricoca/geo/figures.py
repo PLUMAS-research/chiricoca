@@ -41,8 +41,11 @@ def figure_from_geodataframe(
     if bbox is None:
         bbox = geodf.total_bounds
 
-    aspect = (bbox[2] - bbox[0]) / (bbox[3] - bbox[1])
-    fig, ax = plt.subplots(figsize=(height * aspect, height), **kwargs)
+    # el ancho del lienzo descuenta el aspecto geográfico (1/cos(latitud) en un
+    # CRS en grados), que set_axis_aspect aplica después al eje; sin el
+    # descuento el eje queda más angosto que el lienzo y sobran márgenes
+    panel_aspect, _ = _panel_aspect_ratio(geodf, bbox, "auto")
+    fig, ax = plt.subplots(figsize=(height * panel_aspect, height), **kwargs)
 
     if set_limits:
         ax.set_xlim([bbox[0], bbox[2]])

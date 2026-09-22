@@ -5,11 +5,7 @@ import shapely
 
 def to_point_geodataframe(df, longitude, latitude, crs="epsg:4326", drop=False):
     gdf = gpd.GeoDataFrame(
-        df,
-        geometry=df.apply(
-            lambda x: shapely.geometry.Point((x[longitude], x[latitude])), axis=1
-        ),
-        crs=crs,
+        df, geometry=gpd.points_from_xy(df[longitude], df[latitude]), crs=crs
     )
 
     if drop:
@@ -86,20 +82,34 @@ def k_coloreo(geodf, columna=None):
 
     gdf["geometry"] = gdf.buffer(0)
 
+    # una sola consulta al índice espacial da todos los pares que se tocan;
+    # los polígonos sin vecinos entran como nodos aislados y reciben color
+    izquierda, derecha = gdf.sindex.query(gdf.geometry, predicate="intersects")
+    pares = izquierda < derecha
     G = nx.Graph()
-    for i, geom1 in gdf.geometry.items():
-        candidates = gdf.sindex.query(geom1, predicate="intersects")
-        for j in candidates:
-            idx_j = gdf.index[j]
-            if i < idx_j:
-                geom2 = gdf.geometry.iloc[j]
-                if geom1.intersects(geom2) and not geom1.touches(geom2.boundary):
-                    G.add_edge(i, idx_j)
-                elif geom1.touches(geom2):
-                    G.add_edge(i, idx_j)
+    G.add_nodes_from(gdf.index)
+    G.add_edges_from(zip(gdf.index[izquierda[pares]], gdf.index[derecha[pares]]))
 
-    coloring = nx.coloring.greedy_color(G, strategy="largest_first")
+    # el coloreo voraz depende del orden en que recorre los nodos; se prueban
+    # varias estrategias y queda la que usa menos colores
+    estrategias = ("largest_first", "smallest_last", "DSATUR", "independent_set")
+    coloring = min(
+        (nx.coloring.greedy_color(G, strategy=e) for e in estrategias),
+        key=lambda c: max(c.values()) + 1,
+    )
     gdf["color_id"] = gdf.index.map(coloring)
     k = max(coloring.values()) + 1
 
     return gdf, k
+
+
+def projected_centroids(geometry):
+    """Centroides calculados en un CRS proyectado y devueltos al original.
+
+    El centroide de un polígono en grados no es el del polígono en el terreno,
+    así que geopandas avisa cuando se pide sobre un CRS geográfico. Esto
+    proyecta a la zona UTM que corresponda, calcula ahí y vuelve.
+    """
+    if geometry.crs is None or not geometry.crs.is_geographic:
+        return geometry.centroid
+    return geometry.to_crs(geometry.estimate_utm_crs()).centroid.to_crs(geometry.crs)

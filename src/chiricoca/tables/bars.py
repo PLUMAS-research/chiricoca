@@ -3,77 +3,7 @@ import seaborn as sns
 
 from chiricoca.base.weights import normalize_rows
 from chiricoca.base.sorting import _get_sort_key
-from chiricoca.base.labels import layout_labels_horizontal, layout_labels_vertical
-
-
-def _draw_legend_right_bar(ax, df, colors, stacked, normalize, bar_width):
-    """Dibuja leyenda lateral con líneas y codos para barchart vertical apilado."""
-    if not stacked:
-        return False
-    
-    # Calcular posiciones Y desde la última barra
-    last_row = df.iloc[-1]
-    y_origins = []
-    bottom = 0
-    for col in df.columns:
-        height = last_row[col]
-        y_origins.append(bottom + height / 2)
-        bottom += height
-    
-    # Borde derecho de la última barra
-    last_x = len(df) - 1
-    x_right = last_x + bar_width / 2
-    
-    y_max = 1 if normalize else df.sum(axis=1).max()
-    
-    # Normalizar posiciones para layout_labels_vertical (espera 0-1)
-    if normalize:
-        y_origins_norm = y_origins
-    else:
-        y_origins_norm = [y / y_max for y in y_origins]
-    
-    y_finals_norm = layout_labels_vertical(ax, y_origins_norm, df.columns.tolist(), fontsize=8)
-    
-    # Desnormalizar
-    if normalize:
-        y_finals = y_finals_norm
-    else:
-        y_finals = [y * y_max for y in y_finals_norm]
-    
-    tick_length = 0.3
-    box_size = y_max * 0.02
-    box_width = 0.15
-    threshold = y_max * 0.01
-    
-    codo_indices = []
-    codo_count = 0
-    for y_orig, y_final in zip(y_origins, y_finals):
-        if abs(y_final - y_orig) < threshold:
-            codo_indices.append(None)
-        else:
-            codo_indices.append(codo_count)
-            codo_count += 1
-    
-    for y_orig, y_final, label, color, codo_idx in zip(y_origins, y_finals, df.columns, colors, codo_indices):
-        x_end = x_right + tick_length
-        
-        if codo_idx is None:
-            ax.plot([x_right, x_end], [y_final, y_final], color='black', lw=0.5, clip_on=False)
-        else:
-            x_codo = x_right + tick_length * (0.2 + 0.15 * codo_idx)
-            x_codo = min(x_codo, x_right + tick_length * 0.8)
-            ax.plot([x_right, x_codo], [y_orig, y_orig], color='black', lw=0.5, clip_on=False)
-            ax.plot([x_codo, x_codo], [y_orig, y_final], color='black', lw=0.5, clip_on=False)
-            ax.plot([x_codo, x_end], [y_final, y_final], color='black', lw=0.5, clip_on=False)
-        
-        ax.add_patch(plt.Rectangle((x_end + box_width*0.3, y_final - box_size/2), 
-                                   box_width, box_size,
-                                   facecolor=color, edgecolor='black', lw=0.5, clip_on=False))
-        
-        ax.text(x_end + box_width*1.5, y_final, label, va='center', ha='left', fontsize=8,
-                bbox=dict(facecolor='white', edgecolor='none', pad=1, alpha=0.7))
-    
-    return True
+from chiricoca.base.labels import draw_right_legend, layout_labels_horizontal
 
 
 def barchart(
@@ -93,6 +23,7 @@ def barchart(
     annotate_args=None,
     xlabel_levels=False,
     legend=True,
+    legend_args=None,
     return_df=False,
     ax=None,
     fig_args=None,
@@ -139,7 +70,11 @@ def barchart(
         solapamiento en el eje X.
     legend : bool o str
         False/None = sin leyenda, True = leyenda tradicional, 'right' = leyenda
-        lateral con codos (solo stacked=True y horizontal=False).
+        lateral (solo stacked=True y horizontal=False; en otro caso cae en la
+        tradicional).
+    legend_args : dict
+        Argumentos para la leyenda: los de `ax.legend` en la tradicional, o los
+        de `draw_right_legend` (`leader`, `overflow`, `fontsize`) en la lateral.
     return_df : bool
         Si True, retorna (ax, df_procesado).
     ax : matplotlib.axes.Axes
@@ -195,16 +130,21 @@ def barchart(
                 order = sort_key.sort_values(ascending=sort_categories_ascending).index
                 df = df[order]
 
-    sns.set_palette(palette, n_colors=len(df.columns))
+    # los colores van al gráfico y no a la paleta global de seaborn, que
+    # cambiaría todo lo que se dibuje después en la sesión
+    colors = kwargs.pop("color", None)
+    if colors is None:
+        colors = list(sns.color_palette(palette, n_colors=len(df.columns)))
 
     func_name = "bar" if not horizontal else "barh"
 
-    plot = getattr(df.plot, func_name)(
+    getattr(df.plot, func_name)(
         ax=ax,
         stacked=stacked,
         width=bar_width,
         edgecolor="none",
         legend=False,
+        color=colors,
         **kwargs
     )
 
@@ -242,23 +182,16 @@ def barchart(
         ax.set_xticks([])
     
     if legend:
-        if legend == 'right' and not horizontal:
-            colors = sns.color_palette(palette, n_colors=len(df.columns))
-            if not _draw_legend_right_bar(ax, df, colors, stacked, normalize, bar_width):
-                # Fallback a leyenda tradicional si no es stacked
-                ax.legend(
-                    bbox_to_anchor=(1.0, 0.5),
-                    loc="center left",
-                    frameon=False,
-                    reverse=True,
-                )
-        else:
-            ax.legend(
-                bbox_to_anchor=(1.0, 0.5),
-                loc="center left",
-                frameon=False,
-                reverse=True,
+        legend_args = dict(legend_args or {})
+        if legend == 'right' and not horizontal and stacked:
+            # centros de los segmentos de la última barra
+            ultima = df.iloc[-1].to_numpy(dtype=float)
+            centros = ultima.cumsum() - ultima / 2
+            draw_right_legend(
+                ax, centros, df.columns, colors, len(df) - 1 + bar_width / 2, sizes=ultima, **legend_args
             )
+        else:
+            ax.legend(**{"bbox_to_anchor": (1.0, 0.5), "loc": "center left", "frameon": False, "reverse": True, **legend_args})
 
     ax.ticklabel_format(
         axis="y" if not horizontal else "x", useOffset=False, style="plain"

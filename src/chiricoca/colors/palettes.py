@@ -2,7 +2,12 @@ import matplotlib.colors as colors
 import numpy as np
 import seaborn as sns
 
-from . import MidpointNormalize
+
+def sample_palette(source, n):
+    """`n` colores de una paleta de seaborn (por nombre) o de un `Colormap` de matplotlib."""
+    if isinstance(source, colors.Colormap):
+        return [source(v) for v in np.linspace(0, 1, n)]
+    return sns.color_palette(source, n_colors=n)
 
 
 def build_palette(
@@ -14,63 +19,54 @@ def build_palette(
     default_positive="Reds",
     palette_type="light",
 ):
-    cmap_name = None
-    norm = None
-    midpoint = 0.0
-    using_divergent = False
-    built_palette = None
+    """Un color por clase para los bordes `bins`, divergente si las clases cruzan el centro.
+
+    Parameters
+    ----------
+    bins : array-like
+        Bordes de las clases, del mínimo al máximo; hay `len(bins) - 1`
+        clases.
+    palette : str, color o Colormap, optional
+        Un nombre de paleta de seaborn o un `Colormap` se muestrea con una
+        color por clase (o se centra, ver abajo). Un color solo produce una
+        rampa clara u oscura según `palette_type`, nunca divergente. Sin
+        paleta se usa `default_divergent` si las clases cruzan el centro,
+        `default_negative` si están todas por debajo y `default_positive` si
+        están por encima.
+    center_value : float, optional
+        Valor en que se centra la paleta divergente; cero por omisión.
+
+    Notes
+    -----
+    Con clases a ambos lados del centro, la clase que lo contiene recibe el
+    color central de la paleta. Si hay más clases a un lado que al otro, se
+    muestrea una paleta más larga y se descarta el extremo sobrante, así los
+    colores siguen simétricos respecto del centro aunque las clases no lo
+    sean.
+    """
+    bins = np.asarray(bins, dtype=float)
     k = len(bins) - 1
-
-    min_value, max_value = np.min(bins), np.max(bins)
-
-    if center_value is not None:
-        midpoint = center_value
+    midpoint = center_value if center_value is not None else 0.0
+    divergente = bins[0] < midpoint < bins[-1]
 
     if palette is None:
-        if min_value < 0 and max_value > 0:
-            # divergent
-            cmap_name = default_divergent
-            norm = MidpointNormalize(vmin=min_value, vmax=max_value, midpoint=midpoint)
-            using_divergent = True
-        elif min_value < 0:
-            # sequential
-            cmap_name = default_negative
+        if divergente:
+            source = default_divergent
+        elif bins[-1] <= midpoint:
+            source = default_negative
         else:
-            # sequential
-            cmap_name = default_positive
+            source = default_positive
+    elif not isinstance(palette, colors.Colormap) and colors.is_color_like(palette):
+        constructor = sns.light_palette if palette_type == "light" else sns.dark_palette
+        return list(constructor(palette, n_colors=k))
     else:
-        if not isinstance(palette, colors.Colormap):
-            if colors.is_color_like(palette):
-                if palette_type == "light":
-                    built_palette = sns.light_palette(palette, n_colors=k)
-                else:
-                    built_palette = sns.dark_palette(palette, n_colors=k)
-            else:
-                built_palette = sns.color_palette(palette, n_colors=k)
+        source = palette
 
-    if norm is None:
-        if center_value is None:
-            # norm = colors.Normalize(vmin=min_value, vmax=max_value)
-            norm = colors.BoundaryNorm(bins, k)
-        else:
-            norm = MidpointNormalize(vmin=min_value, vmax=max_value, midpoint=midpoint)
-            using_divergent = True
+    if not divergente:
+        return list(sample_palette(source, k))
 
-    if built_palette is None:
-        if not using_divergent:
-            built_palette = sns.color_palette(cmap_name, n_colors=k)
-        else:
-            middle_idx = np.where((bins[:-1] * bins[1:]) <= 0)[0][0]
-            left = middle_idx
-            right = k - middle_idx - 1
-            if left == right:
-                built_palette = sns.color_palette(cmap_name, n_colors=k)
-            else:
-                delta = np.abs(left - right)
-                expanded_k = k + delta
-                start_idx = max(middle_idx - left, right - middle_idx)
-                built_palette = sns.color_palette(cmap_name, n_colors=expanded_k)[
-                    start_idx : start_idx + k
-                ]
-
-    return built_palette
+    middle_idx = int(np.clip(np.searchsorted(bins, midpoint, side="right") - 1, 0, k - 1))
+    left, right = middle_idx, k - middle_idx - 1
+    delta = abs(left - right)
+    start_idx = max(0, right - left)
+    return list(sample_palette(source, k + delta)[start_idx : start_idx + k])

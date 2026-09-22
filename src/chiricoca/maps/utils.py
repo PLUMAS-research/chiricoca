@@ -18,53 +18,41 @@ def geographical_labels(
     format_func=None,
     bounds=None,
     displacements=None,
-    va='center',
-    ha='center'
+    va="center",
+    ha="center",
+    anchor="centroid",
 ):
+    """Rotula cada geometría de `geodf` con su índice o con `column`.
+
+    `anchor` decide dónde va el rótulo: `"centroid"` usa el centroide
+    calculado en un CRS proyectado (`projected_centroids`), que en un polígono
+    cóncavo puede caer fuera de él; `"representative"` usa
+    `representative_point`, que siempre cae dentro. `displacements` es un
+    desplazamiento común `(dx, dy)` o un diccionario etiqueta a desplazamiento.
+    Devuelve la lista de textos, que sirve para pasarla a `adjust_text`.
+    """
+    from chiricoca.geo.utils import projected_centroids
+
+    puntos = (
+        geodf.geometry.representative_point() if anchor == "representative"
+        else projected_centroids(geodf.geometry)
+    )
+    etiquetas = geodf.index if column is None else geodf[column]
+
     labels = []
-
-    for idx, row in geodf.iterrows():
-        centroid = row.geometry.centroid
-
-        if bounds is not None:
-            if not (bounds[0] <= centroid.x <= bounds[2]) or not (
-                bounds[1] <= centroid.y <= bounds[3]
-            ):
-                continue
-        if column is None:
-            label = idx
+    for etiqueta, x, y in zip(etiquetas, puntos.x.to_numpy(), puntos.y.to_numpy()):
+        if bounds is not None and not (bounds[0] <= x <= bounds[2] and bounds[1] <= y <= bounds[3]):
+            continue
+        if isinstance(displacements, dict):
+            dx, dy = displacements.get(etiqueta, (0, 0))
         else:
-            label = row[column]
+            dx, dy = displacements if displacements is not None else (0, 0)
+        texto = format_func(etiqueta) if format_func is not None else etiqueta
 
-        if displacements is not None:
-            if type(displacements) == dict:
-                disp = displacements.get(label, (0, 0))
-            else:
-                disp = displacements
-        else:
-            disp = (0, 0)
-
-        if format_func is not None:
-            label = format_func(label)
-
-        t = ax.text(
-            centroid.x + disp[0],
-            centroid.y + disp[1],
-            label,
-            va=va,
-            horizontalalignment=ha,
-            fontsize=font_size,
-            fontweight=font_weight,
-            color=color,
-        )
+        t = ax.text(x + dx, y + dy, texto, va=va, ha=ha, fontsize=font_size, fontweight=font_weight, color=color)
         if outline:
             t.set_path_effects(
-                [
-                    path_effects.Stroke(
-                        linewidth=outline_width, foreground=outline_color
-                    ),
-                    path_effects.Normal(),
-                ]
+                [path_effects.Stroke(linewidth=outline_width, foreground=outline_color), path_effects.Normal()]
             )
         labels.append(t)
 

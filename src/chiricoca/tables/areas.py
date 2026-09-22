@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from chiricoca.base.collections import LabelCollection
+from chiricoca.base.labels import draw_right_legend
 from chiricoca.base.sorting import _get_sort_key
 
 
@@ -17,19 +18,22 @@ def _x_to_numeric(x):
     return np.arange(len(arr), dtype=float)
 
 
-def _measure_label_bbox_data(ax, text, fontsize, fontweight, outline=False, outline_lw=2):
+def _measure_label_bbox_data(ax, text, fontsize, fontweight, outline=False, outline_lw=2, renderer=None):
     """
     Mide el bbox de una etiqueta en coordenadas de datos.
 
     Si outline=True, aplica un path_effect Stroke con outline_lw para que el
     bbox medido refleje el tamano visual real (la etiqueta in-band se renderiza
-    con outline para destacar sobre la banda).
+    con outline para destacar sobre la banda). `renderer` evita redibujar la
+    figura en cada medición: se obtiene una vez con `fig.canvas.get_renderer()`
+    tras un `fig.canvas.draw()`.
     """
     import matplotlib.patheffects as path_effects
 
-    fig = ax.get_figure()
-    fig.canvas.draw()
-    renderer = fig.canvas.get_renderer()
+    if renderer is None:
+        fig = ax.get_figure()
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
     t = ax.text(0, 0, text, fontsize=fontsize, fontweight=fontweight)
     if outline:
         t.set_path_effects([
@@ -343,53 +347,6 @@ def _build_color_dict(df, palette, highlight, highlight_palette, colors, default
     return color_dict
 
 
-def _draw_legend_right(ax, df, stream_stack, stream_first_line, color_dict, legend_args):
-    """Dibuja leyenda lateral con líneas de codos."""
-    from chiricoca.base.labels import layout_labels_vertical
-    
-    # Posiciones Y en el extremo derecho
-    last_idx = -1
-    positions = {}
-    
-    # Primera área
-    y_center = (stream_first_line[last_idx] + stream_stack[0, last_idx]) / 2
-    positions[df.columns[0]] = y_center
-    
-    # Resto de áreas
-    for i in range(1, len(df.columns)):
-        y_center = (stream_stack[i-1, last_idx] + stream_stack[i, last_idx]) / 2
-        positions[df.columns[i]] = y_center
-    
-    x_right = df.index[-1]
-    
-    # Layout para evitar colisiones
-    labels = list(df.columns)
-    y_orig = [positions[col] for col in labels]
-    
-    fontsize = legend_args.get('fontsize', 9)
-    y_final = layout_labels_vertical(ax, y_orig, labels, fontsize=fontsize)
-    
-    # Dibujar
-    x_offset = (df.index[-1] - df.index[0]) * 0.02
-    x_label = x_right + x_offset * 3
-    
-    for col, y_o, y_f in zip(labels, y_orig, y_final):
-        color = color_dict[col]
-        
-        # Cuadrado de color
-        ax.plot(x_label - x_offset * 0.5, y_f, 's', color=color, 
-                markersize=8, clip_on=False)
-        
-        # Texto
-        ax.text(x_label, y_f, col, va='center', fontsize=fontsize, clip_on=False)
-        
-        # Línea con codo si hay desplazamiento
-        if abs(y_f - y_o) > 0.01:
-            ax.plot([x_right, x_right + x_offset, x_label - x_offset], 
-                    [y_o, y_o, y_f],
-                    color='gray', lw=0.5, clip_on=False)
-
-
 def stacked_areas(ax, df, baseline="zero", color_dict=None, **kwargs):
     """
     Dibuja áreas apiladas y retorna los parámetros de la figura.
@@ -490,7 +447,7 @@ def streamgraph(
     label_args : dict
         Argumentos para el texto de las etiquetas (fontsize, fontweight, color).
     label_rolling_window : int
-        Sin uso. Se mantiene por compatibilidad.
+        Deprecado. Sin efecto; se acepta para no romper llamadas antiguas.
     outline_labels : bool
         Si True, añade contorno a las etiquetas in-band.
     label_score_alpha : float
@@ -512,9 +469,12 @@ def streamgraph(
     label_collision_args : dict
         Deprecado. Sin efecto.
     legend : bool o 'right'
-        False: sin leyenda. True: leyenda tradicional. 'right': leyenda lateral.
+        False: sin leyenda. True: leyenda tradicional. 'right': leyenda lateral
+        de `draw_right_legend`, con cada serie rotulada a la altura en que
+        termina.
     legend_args : dict
-        Argumentos para la leyenda.
+        Argumentos para la leyenda: los de `ax.legend` en la tradicional, o los
+        de `draw_right_legend` (`fontsize`, `leader`, `overflow`) en la lateral.
     normalize : bool
         Si True, normaliza cada fila para que sume 1.
     skip_set_xlim : bool
@@ -637,10 +597,15 @@ def streamgraph(
 
         band_candidates.sort(key=lambda t: -float(t[4].max()))
 
+        # un solo dibujo de la figura para medir todas las etiquetas
+        figura = ax.get_figure()
+        figura.canvas.draw()
+        renderer = figura.canvas.get_renderer()
+
         for i, col_name, lower, upper, band_height in band_candidates:
             bbox_w, bbox_h = _measure_label_bbox_data(
                 ax, col_name, in_band_fontsize, in_band_fontweight,
-                outline=outline_labels,
+                outline=outline_labels, renderer=renderer,
             )
 
             i_best, min_h = _best_label_position(
@@ -708,8 +673,12 @@ def streamgraph(
     # Leyenda
     if legend:
         if legend == 'right':
-            _draw_legend_right(ax, df, stream_stack, stream_first_line, 
-                             color_dict, legend_args)
+            bordes = np.vstack([stream_first_line[None, :], stream_stack])[:, -1]
+            centros = (bordes[:-1] + bordes[1:]) / 2
+            draw_right_legend(
+                ax, centros, df.columns, [color_dict[c] for c in df.columns],
+                _x_to_numeric(stream_x)[-1], sizes=np.diff(bordes), **{"fontsize": 9, **legend_args},
+            )
         else:
             # Leyenda tradicional
             handles = []

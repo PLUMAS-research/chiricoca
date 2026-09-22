@@ -1,13 +1,10 @@
+import warnings
+
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from chiricoca.base.labels import (
-    layout_labels_horizontal,
-    layout_labels_vertical,
-    _draw_legend_right,
-)
+from chiricoca.base.labels import draw_right_legend, layout_labels_horizontal
 from chiricoca.base.sorting import _get_sort_key
 
 
@@ -69,10 +66,12 @@ def marimekko(
     xlabel_levels : bool
         Si True, usa algoritmo de niveles para etiquetas X evitando solapamiento.
         Si False, usa ticks estándar de matplotlib.
-    legend : bool
-        Mostrar leyenda.
+    legend : bool o 'right'
+        Mostrar leyenda; 'right' dibuja la leyenda lateral de `draw_right_legend`.
     legend_args : dict o None
-        Argumentos para la leyenda. Si es 'right', usa leyenda lateral con codos.
+        Argumentos para la leyenda: los de `ax.legend` en la tradicional, o los
+        de `draw_right_legend` (`leader`, `overflow`, `fontsize`) en la lateral.
+        Por compatibilidad, `legend_args='right'` equivale a `legend='right'`.
     palette : str o list
         Paleta de colores.
     ax : matplotlib.axes.Axes o None
@@ -101,6 +100,9 @@ def marimekko(
         fig, ax = plt.subplots(**fig_args)
     
     df = df.copy()
+    if df.isna().any().any():
+        warnings.warn("Hay valores faltantes; se tratan como cero.", stacklevel=2)
+        df = df.fillna(0)
     row_totals = df.sum(axis=1)
     
     # Normalizar primero para que el ordenamiento use proporciones
@@ -194,17 +196,7 @@ def marimekko(
     else:
         ax.set_xticks(x_centers, labels_x)
     
-    # Leyenda
-    if legend:
-        if legend_args == 'right':
-            _draw_legend_right(ax, df, positions, widths, colors)
-        else:
-            if legend_args is None:
-                legend_args = dict(bbox_to_anchor=(1.02, 0.5), loc='center left', frameon=False)
-            handles = [plt.Rectangle((0,0), 1, 1, facecolor=c) for c in reversed(colors)]
-            ax.legend(handles, reversed(df.columns.tolist()), **legend_args)
-    
-    # Límites
+    # Límites (la leyenda lateral los necesita fijos)
     ax.set_xlim(0, positions[-1] + widths.iloc[-1])
     if normalize == 'percent':
         ax.set_ylim(0, 100)
@@ -212,6 +204,21 @@ def marimekko(
         ax.set_ylim(0, 1)
     else:
         ax.set_ylim(0, bottoms.max())
+
+    # Leyenda
+    if legend:
+        lateral = legend == 'right' or legend_args == 'right'
+        args = dict(legend_args) if isinstance(legend_args, dict) else {}
+        if lateral:
+            ultima = df.iloc[-1].to_numpy(dtype=float)
+            draw_right_legend(
+                ax, ultima.cumsum() - ultima / 2, df.columns, colors, positions[-1] + widths.iloc[-1],
+                sizes=ultima, **args,
+            )
+        else:
+            handles = [plt.Rectangle((0,0), 1, 1, facecolor=c) for c in reversed(colors)]
+            ax.legend(handles, reversed(df.columns.tolist()),
+                      **{"bbox_to_anchor": (1.02, 0.5), "loc": "center left", "frameon": False, **args})
     
     if return_df:
         return ax, df

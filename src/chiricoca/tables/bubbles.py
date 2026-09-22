@@ -1,7 +1,7 @@
+import matplotlib.pyplot as plt
+import numpy as np
 import pymunk
 from pymunk.vec2d import Vec2d
-import pymunk.matplotlib_util
-import numpy as np
 
 from matplotlib.patches import Circle
 from matplotlib.collections import PatchCollection
@@ -105,9 +105,6 @@ def bubble_plot(
     Una burbuja también tendrá un color que representa su ubicación en el eje.
     En este gráfico, la posición en el eje `y` de cada burbuja no es relevante.
 
-    En el notebook notebooks/vis-course/06-python-texto-guaguas.ipynb se encuentran ejemplos de uso de esta función.
-
-
     Parameters
     -------------
     ax : matplotlib.axes
@@ -153,14 +150,7 @@ def bubble_plot(
 
     Returns
     -----------
-    space : objeto Space de pymunk
-        El espacio de simulación de pymunk utilizado para las burbujas.
-    collection : objeto PatchCollection de matplotlib, opcional
-        La colección de parches utilizada para dibujar las burbujas en el gráfico. Devuelto solo si dual es False.
-    split_collection_l : objeto PatchCollection de matplotlib, opcional
-        La colección de parches utilizada para dibujar las burbujas duales en el lado izquierdo del gráfico. Devuelto solo si dual es True.
-    split_collection_r : objeto PatchCollection de matplotlib, opcional
-        La colección de parches utilizada para dibujar las burbujas duales en el lado derecho del gráfico. Devuelto solo si dual es True.
+    ax : matplotlib.axes.Axes
     """
 
     if ax is None:
@@ -169,7 +159,7 @@ def bubble_plot(
 
         fig, ax = plt.subplots(**fig_args)
 
-    np.random.seed(random_state)
+    rng = np.random.default_rng(random_state)
     df = df.reset_index()
     space = pymunk.Space()
     space.gravity = (0, 0)
@@ -181,7 +171,7 @@ def bubble_plot(
 
     for idx, row in df.iterrows():
         x = row[position_column] * x_position_scaling
-        y = np.random.randint(-starting_y_range, starting_y_range)
+        y = int(rng.integers(-starting_y_range, starting_y_range))
         mass = 10
         r = radius[idx]
 
@@ -207,8 +197,6 @@ def bubble_plot(
             value_range[1] - value_range[0] * 0.75
         )
         return result
-
-    ax.set_aspect("equal")
 
     cmap = ListedColormap(sns.color_palette(palette, n_colors=n_bins))
 
@@ -294,7 +282,7 @@ def bubble_plot(
     ax.set_xlim([min_x, max_x])
     ax.set_ylim([min_y, max_y])
 
-    return space, collection, split_collection_l, split_collection_r
+    return ax
 
 
 def bubble_size_legend(
@@ -356,33 +344,20 @@ def bubble_size_legend(
     legend : matplotlib.legend.Legend
         El objeto de leyenda creado.
     """
-    import matplotlib.pyplot as plt
-    import numpy as np
+    from matplotlib.lines import Line2D
 
     if bbox_transform is None:
         bbox_transform = ax.transAxes
 
-    # Crear una figura temporal fuera de la vista para generar los elementos de la leyenda
-    temp_fig, temp_ax = plt.subplots(figsize=(1, 1))
-    temp_fig.set_visible(False)
-
-    # Crear elementos de leyenda
-    legend_elements = []
-
-    # Crear scatter points con diferentes tamaños
-    for size, label in zip(sizes, labels):
-        scatter = temp_ax.scatter(
-            [],
-            [],
-            s=size,
-            facecolor=facecolor,
-            edgecolor=edgecolor,
-            alpha=0.7,
-            label=label,
+    # un marcador circular de `markersize` puntos ocupa el área `markersize**2`
+    # de scatter, así que los handles salen sin dibujar nada
+    legend_elements = [
+        Line2D(
+            [], [], linestyle="", marker="o", markersize=float(np.sqrt(size)),
+            markerfacecolor=facecolor, markeredgecolor=edgecolor, alpha=0.7, label=label,
         )
-        legend_elements.append(scatter)
-
-    plt.close(temp_fig)
+        for size, label in zip(sizes, labels)
+    ]
 
     # Crear leyenda en ax con inset_axes para controlar el tamaño
     if location != "out":

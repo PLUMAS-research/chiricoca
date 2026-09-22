@@ -1,8 +1,6 @@
 import numpy as np
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
-from chiricoca.colors import color_legend, colormap_from_palette
+from chiricoca.colors import color_legend, colormap_from_palette, inset_colorbar_axes
 from chiricoca.geo.figures import figure_from_geodataframe
 from chiricoca.geo.kde import kde_from_points
 
@@ -33,6 +31,17 @@ def heat_map(
     fig_args=None,
     **kwargs,
 ):
+    """Mapa de calor por densidad de kernel sobre puntos, como bandas rellenas.
+
+    `bandwidth` va en las unidades del CRS de `geodf`: en grados, 0,01 son
+    cerca de un kilómetro; en un CRS métrico hay que darlo en metros. Con
+    `n_levels` bandas la paleta trae un color por banda.
+
+    Returns
+    -------
+    (contornos, eje_de_la_barra, ax), más la grilla de densidad `(x, y, z)`
+    si `return_heat`.
+    """
     if ax is None:
         if fig_args is None:
             fig_args = {}
@@ -57,44 +66,15 @@ def heat_map(
     if max_threshold is None:
         max_threshold = norm_heat.max()
 
-    print(low_threshold, max_threshold)
+    # n_levels bandas rellenas necesitan n_levels + 1 cortes, uno por color
+    levels = np.linspace(low_threshold, max_threshold, n_levels + 1)
 
-    levels = np.linspace(low_threshold, max_threshold, n_levels)
-
-    # TODO: this should be factorized into an utility function
     if legend_type == "colorbar":
-        # add_ranged_color_legend(ax)
-        if cbar_bbox_transform is None:
-            cbar_bbox_transform = ax.transAxes
-
-        if cbar_location != "out":
-            cbar_ax = inset_axes(
-                ax,
-                width=cbar_width,
-                height=cbar_height,
-                loc=cbar_location,
-                bbox_to_anchor=cbar_bbox_to_anchor,
-                bbox_transform=cbar_bbox_transform,
-                borderpad=0,
-            )
-        else:
-            divider = make_axes_locatable(ax)
-            cbar_main = divider.append_axes(
-                "bottom" if cbar_orientation == "horizontal" else "right",
-                size=cbar_height if cbar_orientation == "horizontal" else cbar_width,
-                pad=cbar_pad,
-            )
-            cbar_main.set_axis_off()
-            cbar_ax = inset_axes(
-                cbar_main,
-                width=cbar_width,
-                height=cbar_height,
-                loc="center",
-                bbox_to_anchor=(0.0, 0.0, 1.0, 1.0),
-                bbox_transform=cbar_main.transAxes,
-                borderpad=0,
-            )
-
+        cbar_ax = inset_colorbar_axes(
+            ax, location=cbar_location, width=cbar_width, height=cbar_height,
+            orientation=cbar_orientation, bbox_to_anchor=cbar_bbox_to_anchor,
+            bbox_transform=cbar_bbox_transform, borderpad=0, pad=cbar_pad,
+        )
         color_legend(cbar_ax, cmap, levels, orientation=cbar_orientation)
     else:
         cbar_ax = None
