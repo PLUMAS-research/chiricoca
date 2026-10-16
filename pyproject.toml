@@ -24,6 +24,7 @@ dependencies = [
     "scipy>=1.17.1",
     "seaborn>=0.13.2",
     "shapely>=2.1.2",
+    "squarify>=0.4.4",
     "wordcloud>=1.9.6",
 ]
 

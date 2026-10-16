@@ -58,10 +58,10 @@ from chiricoca.geo.figures import figure_from_geodataframe
 ```
 
 ### `tables`
-Gráficos estadísticos: Marimekko, streamgraph, barras apiladas, burbujas, scatter, slopegraph, heatmap con clustering jerárquico, ternario y coordenadas paralelas.
+Gráficos estadísticos: Marimekko, streamgraph, barras apiladas, burbujas, scatter, slopegraph, heatmap con clustering jerárquico, ternario, coordenadas paralelas y treemap anidado.
 
 ```python
-from chiricoca.tables import marimekko, streamgraph, barchart, scatterplot, slopegraph, parallel_coordinates
+from chiricoca.tables import marimekko, streamgraph, barchart, scatterplot, slopegraph, parallel_coordinates, treemap
 ```
 
 En los gráficos apilados verticales (`barchart`, `marimekko`, `streamgraph`), `legend="right"` rotula cada serie a la altura en que termina, con una línea guía hasta el rótulo.
